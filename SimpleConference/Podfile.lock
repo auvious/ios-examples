@@ -1,0 +1,39 @@
+PODS:
+  - Alamofire (4.9.1)
+  - AuviousGoogleWebRTC (84.4147.2)
+  - AuviousSDK (1.0.8):
+    - Alamofire (~> 4.7)
+    - AuviousGoogleWebRTC (~> 84.4147.2)
+    - MQTTClient/Websocket (~> 0.15)
+    - SwiftyJSON (~> 5.0)
+  - MQTTClient/Min (0.15.3)
+  - MQTTClient/Websocket (0.15.3):
+    - MQTTClient/Min
+    - SocketRocket
+  - SocketRocket (0.5.1)
+  - SwiftyJSON (5.0.0)
+
+DEPENDENCIES:
+  - AuviousSDK (= 1.0.8)
+
+SPEC REPOS:
+  https://github.com/auvious/CocoaPodSpecs.git:
+    - AuviousGoogleWebRTC
+    - AuviousSDK
+  trunk:
+    - Alamofire
+    - MQTTClient
+    - SocketRocket
+    - SwiftyJSON
+
+SPEC CHECKSUMS:
+  Alamofire: 85e8a02c69d6020a0d734f6054870d7ecb75cf18
+  AuviousGoogleWebRTC: e5a8ede1fb2e5e7a3e75f9a871c08dff7678f963
+  AuviousSDK: 2c5c624ba056050a8ca084273a3cb6c8b7c96a8f
+  MQTTClient: 0dfa04e789479c2e461786464969895c1fcb0875
+  SocketRocket: d57c7159b83c3c6655745cd15302aa24b6bae531
+  SwiftyJSON: 36413e04c44ee145039d332b4f4e2d3e8d6c4db7
+
+PODFILE CHECKSUM: 1f9822018d61da21869d69395b2b131176b985ea
+
+COCOAPODS: 1.10.1

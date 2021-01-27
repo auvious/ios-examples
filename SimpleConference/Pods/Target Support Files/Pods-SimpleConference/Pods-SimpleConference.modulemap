@@ -1,0 +1,6 @@
+framework module Pods_SimpleConference {
+  umbrella header "Pods-SimpleConference-umbrella.h"
+
+  export *
+  module * { export * }
+}
