@@ -3,5 +3,8 @@ ${BUILT_PRODUCTS_DIR}/Alamofire/Alamofire.framework
 ${PODS_ROOT}/AuviousGoogleWebRTC/frameworks/WebRTC.framework
 ${BUILT_PRODUCTS_DIR}/AuviousSDK/AuviousSDK.framework
 ${BUILT_PRODUCTS_DIR}/MQTTClient/MQTTClient.framework
+${BUILT_PRODUCTS_DIR}/RxCocoa/RxCocoa.framework
+${BUILT_PRODUCTS_DIR}/RxRelay/RxRelay.framework
+${BUILT_PRODUCTS_DIR}/RxSwift/RxSwift.framework
 ${BUILT_PRODUCTS_DIR}/SocketRocket/SocketRocket.framework
 ${BUILT_PRODUCTS_DIR}/SwiftyJSON/SwiftyJSON.framework

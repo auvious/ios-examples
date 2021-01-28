@@ -10,5 +10,7 @@ target 'SimpleConference' do
 
   # Pods for SimpleConference
   pod 'AuviousSDK', '1.0.8'
+  pod 'RxSwift', '6.0.0'
+  pod 'RxCocoa', '6.0.0'
 
 end
