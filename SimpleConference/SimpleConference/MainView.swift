@@ -29,8 +29,7 @@ struct MainView: View {
             TextField("ticket", text: $ticket)
                 .frame(width: 100, height: 20)
                 .padding(4)
-                .overlay(RoundedRectangle(cornerRadius: 10)
-                            .stroke())
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke())
             Button("VideoCall", action: {
                 PermissionsManager.checkAVPermission(AVMediaType.audio)
                     .andThen(PermissionsManager.checkAVPermission(AVMediaType.video))
@@ -48,8 +47,7 @@ struct MainView: View {
             })
             .frame(width: 100, height: 33)
             .padding(4)
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                        .stroke())
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke())
         }
         .fullScreenCover(isPresented: $showingAuviousSimpleConferenceView, onDismiss: showAlertFunction) {
             AuviousSimpleConferenceView(ticket: self.$ticket, error: self.$error)
