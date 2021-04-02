@@ -412,7 +412,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             for peerConnection in rtcClient.peerConnections {
                 if peerConnection.isLocal == false {
                     
-                    if let endpointId = UserEndpointModule.sharedInstance.userEndpointId, let conference = currentConference, let viewerId = self.viewerIdMap[peerConnection.streamId] {
+                    if let _ = UserEndpointModule.sharedInstance.userEndpointId, let conference = currentConference, let viewerId = self.viewerIdMap[peerConnection.streamId] {
                         let svsRequest = StopViewStreamRequest(conferenceId: conference.id, streamId: peerConnection.streamId, userEndpointId: peerConnection.endpointId, userId: peerConnection.userId, viewerId: viewerId)
                         API.sharedInstance.stopViewStream(svsRequest, onSuccess: {(response) in
                             //success
@@ -652,7 +652,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      - Parameter onLoginFailure: Called in case of failure with the designated Error
      */
     public func login(onLoginSuccess: @escaping (String?, String?)->(), onLoginFailure: @escaping (Error)->()) {
-        guard let username = self.username, let password = self.password, let clientId = self.clientId else {
+        guard let username = self.username, let password = self.password, let _ = self.clientId else {
             onLoginFailure(AuviousSDKError.missingSDKCredentials)
             return
         }
@@ -715,7 +715,11 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             })
             
         }, onFailure: {(error) in
-            onFailure(error)
+            self.logoutRequest(onSuccess: {
+                onSuccess()
+            }, onFailure: {(error) in
+                onFailure(error)
+            })
         })
     }
     
@@ -752,6 +756,35 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         self.currentConference = nil
     }
     
+    //Helper for HOLD, MUTE/UNMUTE functionality
+    internal func removeLocalVideoStream() {
+        if let stream = self.rtcClient.localStream, let localVideo = self.rtcClient.localVideoTrack {
+            stream.removeVideoTrack(localVideo)
+            os_log("RTCClient removed local video track", log: Log.conferenceSDK, type: .debug)
+        }
+    }
+    
+    internal func removeLocalAudioStream() {
+        if let stream = self.rtcClient.localStream, let localAudio = self.rtcClient.localAudioTrack {
+            stream.removeAudioTrack(localAudio)
+            os_log("RTCClient removed local audio track", log: Log.conferenceSDK, type: .debug)
+        } 
+    }
+    
+    internal func addLocalVideoStream() {
+        if let stream = self.rtcClient.localStream, let localVideo = self.rtcClient.localVideoTrack {
+            stream.addVideoTrack(localVideo)
+            os_log("RTCClient added local video track", log: Log.conferenceSDK, type: .debug)
+        }
+    }
+    
+    internal func addLocalAudioStream() {
+        if let stream = self.rtcClient.localStream, let localAudio = self.rtcClient.localAudioTrack {
+            stream.addAudioTrack(localAudio)
+            os_log("RTCClient added local audio track", log: Log.conferenceSDK, type: .debug)
+        }
+    }
+    
     public func toggleLocalStream(conferenceId: String, streamId: String, operation: MetadataRequestOperation, type: MetadataRequestType, onSuccess: @escaping ()->(), onFailure: @escaping (Error)->()) {
         guard let endpointId = UserEndpointModule.sharedInstance.userEndpointId else {
             onFailure(AuviousSDKError.endpointNotCreated)
@@ -775,27 +808,15 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
                 
                 if operation == .set {
                     if type == .video {
-                        if let stream = self.rtcClient.localStream, let localVideo = self.rtcClient.localVideoTrack {
-                            stream.removeVideoTrack(localVideo)
-                            os_log("RTCClient removed local video track", log: Log.conferenceSDK, type: .debug)
-                        }
+                        self.removeLocalVideoStream()
                     } else if type == .audio {
-                        if let stream = self.rtcClient.localStream, let localAudio = self.rtcClient.localAudioTrack {
-                            stream.removeAudioTrack(localAudio)
-                            os_log("RTCClient removed local audio track", log: Log.conferenceSDK, type: .debug)
-                        }
+                        self.removeLocalAudioStream()
                     }
                 } else if operation == .remove {
                     if type == .video {
-                        if let stream = self.rtcClient.localStream, let localVideo = self.rtcClient.localVideoTrack {
-                            stream.addVideoTrack(localVideo)
-                            os_log("RTCClient added local video track", log: Log.conferenceSDK, type: .debug)
-                        }
+                        self.addLocalVideoStream()
                     } else if type == .audio {
-                        if let stream = self.rtcClient.localStream, let localAudio = self.rtcClient.localAudioTrack {
-                            stream.addAudioTrack(localAudio)
-                            os_log("RTCClient added local audio track", log: Log.conferenceSDK, type: .debug)
-                        }
+                        self.addLocalAudioStream()
                     }
                 }
                 
@@ -886,7 +907,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     //MQTT message delegation
     private func delegateConferenceMessage(msg: ConferenceEvent) {
         switch msg.type! {
-        case .conferenceJoined, .conferenceLeft, .conferenceStreamPublished:
+        case .conferenceJoined, .conferenceLeft, .conferenceStreamPublished, .conferenceNetworkIndicatorEvent:
             delegate?.auviousSDK(didReceiveConferenceEvent: msg)
         case .conferenceEnded:
             removeAllStreams()

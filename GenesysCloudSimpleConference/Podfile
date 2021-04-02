@@ -9,8 +9,8 @@ target 'GenesysCloudSimpleConference' do
   use_frameworks!
 
   # Pods for GenesysCloudSimpleConference
-  pod 'AuviousSDK', '1.0.8'
-  pod 'RxSwift', '6.0.0'
-  pod 'RxCocoa', '6.0.0'
+  pod 'AuviousSDK', '1.0.10'
+  pod 'RxSwift', '6.1.0'
+  pod 'RxCocoa', '6.1.0'
 
 end
