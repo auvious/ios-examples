@@ -9,7 +9,7 @@ target 'SimpleConference' do
   use_frameworks!
 
   # Pods for SimpleConference
-  pod 'AuviousSDK', '1.0.10'
+  pod 'AuviousSDK', '1.1.0'
   pod 'RxSwift', '6.1.0'
   pod 'RxCocoa', '6.1.0'
 
