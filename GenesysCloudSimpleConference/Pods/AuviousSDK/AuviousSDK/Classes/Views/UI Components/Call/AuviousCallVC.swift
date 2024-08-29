@@ -45,12 +45,13 @@ open class AuviousCallVC: UIViewController, AuviousSDKCallDelegate {
     private var baseEndpoint: String = ""
     private var mqttEndpoint: String = ""
     private var sipHeaders: [String : String]?
+    private var configuredStreamType: StreamType = .unknown
     
     //Call timers
     private var waitForAnswerTimer: Timer?
     public var waitForAnswerDuration: TimeInterval = 10
     
-    public init(username: String, password: String, target: String, baseEndpoint: String, mqttEndpoint: String, sipHeaders: [String : String]? = nil, delegate: AuviousSimpleCallDelegate) {
+    public init(username: String, password: String, target: String, baseEndpoint: String, mqttEndpoint: String, sipHeaders: [String : String]? = nil, delegate: AuviousSimpleCallDelegate, callMode: AuviousCallMode) {
         
         self.username = username
         self.password = password
@@ -59,6 +60,15 @@ open class AuviousCallVC: UIViewController, AuviousSDKCallDelegate {
         self.mqttEndpoint = mqttEndpoint
         self.delegate = delegate
         self.sipHeaders = sipHeaders
+        
+        switch callMode {
+        case .audio:
+            configuredStreamType = .mic
+        case .video:
+            configuredStreamType = .cam
+        case .audioVideo:
+            configuredStreamType = .micAndCam
+        }
         
         // Create a Sentry client and start crash handler
 //        do {
@@ -182,14 +192,14 @@ open class AuviousCallVC: UIViewController, AuviousSDKCallDelegate {
             os_log("Configured CallSDK", log: Log.callUI, type: .debug)
             
             //Get access to the local video stream immediately
-            let localStream = AuviousCallSDK.sharedInstance.createLocalMediaStream(type: .micAndCam, streamId: "test")
+            let localStream = AuviousCallSDK.sharedInstance.createLocalMediaStream(type: configuredStreamType, streamId: "test")
             os_log("Created local media stream", log: Log.callUI, type: .debug)
             
             AuviousCallSDK.sharedInstance.login(oAuth: true, onLoginSuccess: {(endpointId) in
                 os_log("Login success", log: Log.callUI, type: .debug)
                 
                 do {
-                    self.callId = try AuviousCallSDK.sharedInstance.startCallFlow(target: self.target, sendMode: .micAndCam, localStream: localStream, sipHeaders: self.sipHeaders)
+                    self.callId = try AuviousCallSDK.sharedInstance.startCallFlow(target: self.target, sendMode: self.configuredStreamType, localStream: localStream, sipHeaders: self.sipHeaders)
                     self.startWaitingAnswerTimer()
                     
                     os_log("Started call %@", log: Log.callUI, type: .debug, String(describing: self.callId))
@@ -285,6 +295,10 @@ open class AuviousCallVC: UIViewController, AuviousSDKCallDelegate {
     }
     
     public func auviousSDK(didChangeState newState: StreamEventState, callId: String, streamType: StreamType) {
+        
+    }
+    
+    public func auviousSDK(didReceiveLocalStream stream: RTCMediaStream, streamId: String, type: StreamType) {
         
     }
     

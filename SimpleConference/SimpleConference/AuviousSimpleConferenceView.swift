@@ -11,6 +11,7 @@ import AuviousSDK
 struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Environment(\.presentationMode) var presentationMode
     @Binding var ticket: String
+    @Binding var callMode: AuviousCallMode
     @Binding var error: Error?
     
     func makeUIViewController(context: Context) -> AuviousConferenceVCNew {
@@ -18,7 +19,7 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         let baseEndpoint: String = "https://auvious.video/"
         let mqttEndpoint: String = "wss://events.auvious.video/ws"
         let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
-        let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator)
+        let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: callMode)
 
         return vc
     }
