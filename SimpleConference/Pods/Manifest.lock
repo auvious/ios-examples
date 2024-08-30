@@ -1,7 +1,7 @@
 PODS:
   - Alamofire (4.9.1)
   - AuviousGoogleWebRTC (84.4147.2)
-  - AuviousSDK (1.2.0-beta.4):
+  - AuviousSDK (1.2.1):
     - Alamofire (~> 4.7)
     - AuviousGoogleWebRTC (~> 84.4147.2)
     - MQTTClient/Websocket (~> 0.15)
@@ -21,7 +21,7 @@ PODS:
   - SwiftyJSON (5.0.2)
 
 DEPENDENCIES:
-  - AuviousSDK (= 1.2.0-beta.4)
+  - AuviousSDK (= 1.2.1)
   - RxCocoa (= 6.1.0)
   - RxSwift (= 6.1.0)
 
@@ -41,7 +41,7 @@ SPEC REPOS:
 SPEC CHECKSUMS:
   Alamofire: 85e8a02c69d6020a0d734f6054870d7ecb75cf18
   AuviousGoogleWebRTC: e5a8ede1fb2e5e7a3e75f9a871c08dff7678f963
-  AuviousSDK: 54438dac6648c04563a112b55b6fd055701191fe
+  AuviousSDK: 7416aeaa0794c0ae8bcc015f73a66fdb4f96b725
   MQTTClient: 0dfa04e789479c2e461786464969895c1fcb0875
   RxCocoa: 5c51f02d562cbd94629f6c26cf0c80fe4ab8d343
   RxRelay: 483e1a19fad961b41f0b0c0bee506f46c1ae14fe
@@ -49,6 +49,6 @@ SPEC CHECKSUMS:
   SocketRocket: d57c7159b83c3c6655745cd15302aa24b6bae531
   SwiftyJSON: f5b1bf1cd8dd53cd25887ac0eabcfd92301c6a5a
 
-PODFILE CHECKSUM: 3b02f1c4cc6a9298116ccfa96a63e1bfb65d4a74
+PODFILE CHECKSUM: ce249ecdb9d9d4ceaf5e7c46820fa6392fc4a237
 
 COCOAPODS: 1.15.2
