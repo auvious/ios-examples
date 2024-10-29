@@ -11,6 +11,7 @@ import os
 public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDelegate {
     
     //UI components
+    private var clientConfiguration = AuviousConferenceConfiguration()
     
     //Network indicator view
     private let networkIndicator = NetworkIndicatorView()
@@ -84,7 +85,36 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     }
     
     //Public constructor
-    public init(clientId: String, params: [String: String], baseEndpoint: String, mqttEndpoint: String, delegate: AuviousSimpleConferenceDelegate,  callMode: AuviousCallMode) {
+    public init(configuration: AuviousConferenceConfiguration, delegate: AuviousSimpleConferenceDelegate) {
+        self.clientConfiguration = configuration
+        
+        self.clientId = configuration.clientId
+        self.baseEndpoint = configuration.baseEndpoint
+        self.mqttEndpoint = configuration.mqttEndpoint
+        self.username = configuration.username
+        self.password = configuration.password
+        self.conference = configuration.conference
+        self.delegate = delegate
+        
+        self.params["username"] = configuration.username
+        self.params["password"] = configuration.password
+        self.params["grant_type"] = configuration.grantType
+        
+        switch configuration.callMode {
+        case .audio:
+            configuredStreamType = .mic
+        case .video:
+            configuredStreamType = .cam
+        case .audioVideo:
+            configuredStreamType = .micAndCam
+        }
+        
+        super.init(nibName: nil, bundle: Bundle(for: AuviousConferenceVC.self))
+        os_log("UI Conference component: initialised", log: Log.conferenceUI, type: .debug)
+    }
+    
+    //Public constructor
+    public init(clientId: String, params: [String: String], baseEndpoint: String, mqttEndpoint: String, delegate: AuviousSimpleConferenceDelegate, callMode: AuviousCallMode) {
         self.params = params
         self.clientId = clientId
         self.baseEndpoint = baseEndpoint
@@ -154,7 +184,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
 
         NotificationCenter.default.addObserver(self, selector: #selector(self.orientationChanged), name: UIApplication.didChangeStatusBarOrientationNotification, object: nil)
         
-        view.backgroundColor = .black
+        view.backgroundColor = clientConfiguration.conferenceBackgroundColor
         
         //Setup the container of all stream views
         streamContainerView = UIView(frame: .zero)
@@ -807,6 +837,9 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
             
             //Refresh UI
             self.createConstraints()
+            
+            //Respect client configuration for audio routing
+            let result = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: self.clientConfiguration.enableSpeaker)
         }
     }
     
@@ -932,7 +965,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     //Creates the button bar
     private func createButtonBar() {
         //Button container
-        buttonContainerView = ConferenceButtonBar(frame: .zero)
+        buttonContainerView = ConferenceButtonBar(configuration: clientConfiguration)
         buttonContainerView.delegate = self
         view.addSubview(buttonContainerView)
         
@@ -1411,6 +1444,19 @@ extension AuviousConferenceVCNew: ConferenceButtonBarDelegate {
     @objc internal func camSwitchButtonPressed(_ sender: Any) {
         selectionFeedbackGenerator.impactOccurred()
         AuviousConferenceSDK.sharedInstance.switchCamera()
+    }
+    
+    @objc internal func speakerButtonPressed(_ sender: Any) {
+        selectionFeedbackGenerator.impactOccurred()
+        let button = sender as! ConferenceButton
+        
+        if button.type == .speakerON {
+            button.type = .speakerOFF
+            let _ = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: false)
+        } else {
+            button.type = .speakerON
+            let _ = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: true)
+        }
     }
     
     @objc internal func cameraButtonPressed(_ sender: Any) {

@@ -11,12 +11,16 @@ import os
 public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDelegate {
     
     //UI components
+    private var clientConfiguration = AuviousConferenceConfiguration()
     
     //Network indicator view
     private let networkIndicator = NetworkIndicatorView()
     private let networkIndicatorDetails = NetworkDetailsNotificationView(with: nil)
     private var hideNetworkDetailsBlock: DispatchWorkItem?
     private var lastKnownNetworkStatistics: NetworkStatistics? = nil
+    private let notification = DismissableNotificationView(title: "", subtitle: "")
+    private var hideNotificationBlock: DispatchWorkItem?
+    private let recorderIndicator = UIView()
     
     //Container of all stream views
     private var streamContainerView: UIView!
@@ -37,6 +41,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     private let viewPadding: CGFloat = 10
     private let viewSize: CGFloat = 80
     private var networkIndicatorDetailsTop: NSLayoutConstraint!
+    private var notificationTop: NSLayoutConstraint!
     private let maximumRemoteStreamsRendered = 3
     
     //UI feedback
@@ -80,7 +85,36 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     }
     
     //Public constructor
-    public init(clientId: String, params: [String: String], baseEndpoint: String, mqttEndpoint: String, delegate: AuviousSimpleConferenceDelegate,  callMode: AuviousCallMode) {
+    public init(configuration: AuviousConferenceConfiguration, delegate: AuviousSimpleConferenceDelegate) {
+        self.clientConfiguration = configuration
+        
+        self.clientId = configuration.clientId
+        self.baseEndpoint = configuration.baseEndpoint
+        self.mqttEndpoint = configuration.mqttEndpoint
+        self.username = configuration.username
+        self.password = configuration.password
+        self.conference = configuration.conference
+        self.delegate = delegate
+        
+        self.params["username"] = configuration.username
+        self.params["password"] = configuration.password
+        self.params["grant_type"] = configuration.grantType
+        
+        switch configuration.callMode {
+        case .audio:
+            configuredStreamType = .mic
+        case .video:
+            configuredStreamType = .cam
+        case .audioVideo:
+            configuredStreamType = .micAndCam
+        }
+        
+        super.init(nibName: nil, bundle: Bundle(for: AuviousConferenceVC.self))
+        os_log("UI Conference component: initialised", log: Log.conferenceUI, type: .debug)
+    }
+    
+    //Public constructor
+    public init(clientId: String, params: [String: String], baseEndpoint: String, mqttEndpoint: String, delegate: AuviousSimpleConferenceDelegate, callMode: AuviousCallMode) {
         self.params = params
         self.clientId = clientId
         self.baseEndpoint = baseEndpoint
@@ -150,7 +184,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
 
         NotificationCenter.default.addObserver(self, selector: #selector(self.orientationChanged), name: UIApplication.didChangeStatusBarOrientationNotification, object: nil)
         
-        view.backgroundColor = .black
+        view.backgroundColor = clientConfiguration.conferenceBackgroundColor
         
         //Setup the container of all stream views
         streamContainerView = UIView(frame: .zero)
@@ -168,9 +202,41 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         networkIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor).isActive = true
         networkIndicator.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor).isActive = true
         networkIndicator.widthAnchor.constraint(equalToConstant: 40).isActive = true
-        networkIndicator.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        networkIndicator.heightAnchor.constraint(equalToConstant: 40).isActive = true
         let tapRecogniser = UITapGestureRecognizer(target: self, action: #selector(self.networkIndicatorPressed))
         networkIndicator.addGestureRecognizer(tapRecogniser)
+        
+        //Recorder indicator
+        recorderIndicator.backgroundColor = UIColor.red
+        recorderIndicator.layer.cornerRadius = 5
+        recorderIndicator.layer.masksToBounds = true
+        recorderIndicator.alpha = 0;
+        
+        // REC text
+        let recLabel = UILabel()
+        recLabel.text = "REC"
+        recLabel.textColor = UIColor.white
+        recLabel.font = UIFont.boldSystemFont(ofSize: 14) // Set the font size as needed
+        recLabel.textAlignment = .center
+        // Add the label to the view
+        recorderIndicator.addSubview(recLabel)
+        
+        // Set up Auto Layout constraints
+        recLabel.translatesAutoresizingMaskIntoConstraints = false
+        recLabel.centerXAnchor.constraint(equalTo: recorderIndicator.centerXAnchor).isActive = true
+        recLabel.centerYAnchor.constraint(equalTo: recorderIndicator.centerYAnchor).isActive = true
+
+        recorderIndicator.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(recorderIndicator)
+        
+        recorderIndicator.widthAnchor.constraint(equalToConstant: 50).isActive = true
+        recorderIndicator.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        
+        recorderIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: 5).isActive = true
+        recorderIndicator.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor, constant: 45).isActive = true
+       
+        let recTapRecogniser = UITapGestureRecognizer(target: self, action: #selector(self.recorderIndicatorPressed))
+        recorderIndicator.addGestureRecognizer(recTapRecogniser)
         
         //Network indicator details
         view.addSubview(networkIndicatorDetails)
@@ -179,10 +245,26 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         networkIndicatorDetails.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor, constant: 10).isActive = true
         networkIndicatorDetails.trailingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.trailingAnchor, constant: -10).isActive = true
         networkIndicatorDetails.heightAnchor.constraint(equalToConstant: 60).isActive = true
-        networkIndicatorDetailsTop = networkIndicatorDetails.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: -100)
+        networkIndicatorDetailsTop = networkIndicatorDetails.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: -150)
         networkIndicatorDetailsTop.isActive = true
         networkIndicatorDetails.closeButton.addTarget(self, action: #selector(self.hideNetworkDetailsPressed), for: .touchUpInside)
         view.bringSubviewToFront(networkIndicatorDetails)
+        
+        //Generic dismissable notification
+        view.addSubview(notification)
+        notification.layer.zPosition = 2101
+        notification.alpha = 0
+        notification.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor, constant: 10).isActive = true
+        notification.trailingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.trailingAnchor, constant: -10).isActive = true
+        notification.heightAnchor.constraint(equalToConstant: 60).isActive = true
+        notificationTop = notification.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: -150)
+        notificationTop.isActive = true
+        notification.closeButton.addTarget(self, action: #selector(self.hideNotificationPressed), for: .touchUpInside)
+        view.bringSubviewToFront(notification)
+        
+        hideNotificationBlock = DispatchWorkItem {
+            self.hideNotification()
+        }
         
         //Setup a cancellable piece of code to hide the network details
         hideNetworkDetailsBlock = DispatchWorkItem {
@@ -205,12 +287,47 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
 
         createButtonBar()
     }
+    
+    //Shows the toast notification view
+    @objc private func showNotification(with title: String, subtitle: String?) {
+        notification.updateUI(withTitle: title, subtitle: subtitle)
+        
+        UIView.animate(withDuration: 0.2, animations: {
+            self.notification.alpha = 1
+            self.notificationTop.constant = 10
+            self.view.layoutIfNeeded()
+        }, completion: { finished in
+            if finished {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    self.hideNotification()
+                }
+            }
+        })
+    }
+    
+    //Hides the toast notification view
+    @objc private func hideNotification() {
+        UIView.animate(withDuration: 0.2, animations: {
+            self.notification.alpha = 0
+            self.notificationTop.constant = -150
+            self.view.layoutIfNeeded()
+        }, completion: { finished in
+            self.notification.updateUI(withTitle: "", subtitle: "")
+        })
+    }
+    
+    //Cancels the scheduled dismissal of the toast view and hides it
+    @objc private func hideNotificationPressed() {
+        self.hideNotificationBlock?.cancel()
+        hideNotification()
+    }
+    
+    
      
     //Shows the toast notification view
     @objc private func showNetworkDetails() {
-        networkIndicatorDetails.alpha = 1
-        
         UIView.animate(withDuration: 0.2, animations: {
+            self.networkIndicatorDetails.alpha = 1
             self.networkIndicatorDetailsTop.constant = 10
             self.view.layoutIfNeeded()
         }, completion: { finished in
@@ -224,19 +341,30 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     
     //Hides the toast notification view
     @objc private func hideNetworkDetails() {
+        
         UIView.animate(withDuration: 0.2, animations: {
-            self.networkIndicatorDetailsTop.constant = -100
+            self.networkIndicatorDetails.alpha = 0
+            self.networkIndicatorDetailsTop.constant = -150
             self.view.layoutIfNeeded()
         }, completion: { finished in
             self.networkIndicatorDetails.updateUI(with: self.lastKnownNetworkStatistics)
         })
     }
+
     
     //Updates the toast notification view with latest network data and displays the view
     @objc private func networkIndicatorPressed() {
         networkIndicatorDetails.updateUI(with: lastKnownNetworkStatistics)
         showNetworkDetails()
     }
+    
+    @objc private func recorderIndicatorPressed() {
+        showNotification(
+            with: NSLocalizedString("Recording", comment: "Notification"),
+            subtitle: NSLocalizedString("Session is being recorded", comment: "Notification")
+        )
+    }
+
     
     //Cancels the scheduled dismissal of the toast view and hides it
     @objc private func hideNetworkDetailsPressed() {
@@ -709,6 +837,9 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
             
             //Refresh UI
             self.createConstraints()
+            
+            //Respect client configuration for audio routing
+            let result = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: self.clientConfiguration.enableSpeaker)
         }
     }
     
@@ -777,6 +908,20 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         }
     }
     
+    public func auviousSDK(recorderStateChanged toActive: Bool) {
+        // show a notification
+        os_log("recorder state changed", log: Log.conferenceUI, type: .debug )
+        
+        showNotification(
+            with: NSLocalizedString("Recording", comment: "Notification"),
+            subtitle: toActive
+            ? NSLocalizedString("Session is being recorded", comment: "Notification")
+            : NSLocalizedString("Session is no longer recorded", comment: "Notification")
+            
+        )
+        recorderIndicator.alpha = toActive ? 1 : 0
+    }
+    
     public func auviousSDK(trackMuted type: StreamType, endpointId: String) {
         var remoteParticipantIndex: Int?
         for (index, item) in remoteViews.enumerated() {
@@ -820,7 +965,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     //Creates the button bar
     private func createButtonBar() {
         //Button container
-        buttonContainerView = ConferenceButtonBar(frame: .zero)
+        buttonContainerView = ConferenceButtonBar(configuration: clientConfiguration)
         buttonContainerView.delegate = self
         view.addSubview(buttonContainerView)
         
@@ -1299,6 +1444,19 @@ extension AuviousConferenceVCNew: ConferenceButtonBarDelegate {
     @objc internal func camSwitchButtonPressed(_ sender: Any) {
         selectionFeedbackGenerator.impactOccurred()
         AuviousConferenceSDK.sharedInstance.switchCamera()
+    }
+    
+    @objc internal func speakerButtonPressed(_ sender: Any) {
+        selectionFeedbackGenerator.impactOccurred()
+        let button = sender as! ConferenceButton
+        
+        if button.type == .speakerON {
+            button.type = .speakerOFF
+            let _ = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: false)
+        } else {
+            button.type = .speakerON
+            let _ = AuviousConferenceSDK.sharedInstance.changeAudioRoot(toSpeaker: true)
+        }
     }
     
     @objc internal func cameraButtonPressed(_ sender: Any) {
