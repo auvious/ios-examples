@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 51;
 	objects = {
 
 /* Begin PBXAggregateTarget section */
@@ -2352,7 +2352,7 @@
 				LastUpgradeCheck = 1500;
 			};
 			buildConfigurationList = 4821239608C13582E20E6DA73FD5F1F9 /* Build configuration list for PBXProject "Pods" */;
-			compatibilityVersion = "Xcode 12.0";
+			compatibilityVersion = "Xcode 10.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -3627,7 +3627,7 @@
 				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/AuviousSDK";
 				IBSC_MODULE = AuviousSDK;
 				INFOPLIST_FILE = "Target Support Files/AuviousSDK/ResourceBundle-AuviousSDKAssets-AuviousSDK-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				PRODUCT_NAME = AuviousSDKAssets;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -3741,7 +3741,7 @@
 				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/AuviousSDK";
 				IBSC_MODULE = AuviousSDK;
 				INFOPLIST_FILE = "Target Support Files/AuviousSDK/ResourceBundle-AuviousSDKAssets-AuviousSDK-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				PRODUCT_NAME = AuviousSDKAssets;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
