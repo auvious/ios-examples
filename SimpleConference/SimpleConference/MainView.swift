@@ -17,6 +17,12 @@ struct MainView: View {
     @State private var showingAlert = false
     @State private var error: Error?
     @State private var callMode: AuviousCallMode = .audioVideo
+    @State private var isAudioOutputToSpeaker = true
+    @State private var isCameraEnabled = true
+    @State private var isMicrophoneEnabled = true
+    @State private var isSpeakerEnabled = true
+    @State private var isCustomBackground = false
+    
     
     private var disposeBag = DisposeBag()
     
@@ -27,83 +33,153 @@ struct MainView: View {
                 .font(.title)
             
             Text("Click on the buttons below to start a call")
-                .frame(width: 300, height: 100)
+                .frame( height: 10)
             
-            TextField("ticket", text: $ticket)
-                .frame(width: 200, height: 20)
-                .padding(4)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke())
+            HStack {
+                // Text Field
+                TextField("ticket", text: $ticket)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(.leading)
+                
+                // Dismiss Button
+                Button(action: {
+                    hideKeyboard()
+                }) {
+                    Text("Dismiss")
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                }
+            }
+            .padding()
             
-            Button("Audio Call", action: {
-                PermissionsManager.checkAVPermission(AVMediaType.audio)
-                    .subscribe {
-                        os_log("audio permission granted")
-                        self.callMode = .audio
-                        self.showingAuviousSimpleConferenceView = true
-                    } onError: { (error) in
-                        os_log("permission not granted: \(error.localizedDescription)")
-                        self.error = error
-                        self.showAlertFunction()
-                    } onDisposed: {
-                        os_log("permissions completable disposed")
-                    }
-                    .disposed(by: disposeBag)
-            })
-            .frame(width: 300, height: 33)
-            .padding(4)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke())
+            HStack {
+                Button("Audio Call", action: {
+                    PermissionsManager.checkAVPermission(AVMediaType.audio)
+                        .subscribe {
+                            os_log("audio permission granted")
+                            self.callMode = .audio
+                            self.showingAuviousSimpleConferenceView = true
+                        } onError: { (error) in
+                            os_log("permission not granted: \(error.localizedDescription)")
+                            self.error = error
+                            self.showAlertFunction()
+                        } onDisposed: {
+                            os_log("permissions completable disposed")
+                        }
+                        .disposed(by: disposeBag)
+                })
+//                .frame(width: 100)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+                
+                Button ("Camera Call", action: {
+                    PermissionsManager.checkAVPermission(AVMediaType.video)
+                        .subscribe {
+                            os_log("video permission granted")
+                            self.callMode = .video
+                            self.showingAuviousSimpleConferenceView = true
+                        } onError: { (error) in
+                            os_log("permission not granted: \(error.localizedDescription)")
+                            self.error = error
+                            self.showAlertFunction()
+                        } onDisposed: {
+                            os_log("permissions completable disposed")
+                        }
+                        .disposed(by: disposeBag)
+                })
+//                .frame(width: 100)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+                
+                Button("Video Call", action: {
+                    PermissionsManager.checkAVPermission(AVMediaType.audio)
+                        .andThen(PermissionsManager.checkAVPermission(AVMediaType.video))
+                        .subscribe {
+                            os_log("all permissions granted")
+                            self.callMode = .audioVideo
+                            self.showingAuviousSimpleConferenceView = true
+                        } onError: { (error) in
+                            os_log("permissions not granted: \(error.localizedDescription)")
+                            self.error = error
+                            self.showAlertFunction()
+                        } onDisposed: {
+                            os_log("permissions completable disposed")
+                        }
+                        .disposed(by: disposeBag)
+                })
+//                .frame(width: 100)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }.padding()
             
-            Button ("Camera Call", action: {
-                PermissionsManager.checkAVPermission(AVMediaType.video)
-                    .subscribe {
-                        os_log("video permission granted")
-                        self.callMode = .video
-                        self.showingAuviousSimpleConferenceView = true
-                    } onError: { (error) in
-                        os_log("permission not granted: \(error.localizedDescription)")
-                        self.error = error
-                        self.showAlertFunction()
-                    } onDisposed: {
-                        os_log("permissions completable disposed")
-                    }
-                    .disposed(by: disposeBag)
-            })
-            .frame(width: 300, height: 33)
-            .padding(4)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke())
+            Toggle(isOn: $isAudioOutputToSpeaker) {
+                Text("audio output to speaker")
+                    .font(.body)
+            }
+            .padding(.vertical, 8)
             
-            Button("Video Call", action: {
-                PermissionsManager.checkAVPermission(AVMediaType.audio)
-                    .andThen(PermissionsManager.checkAVPermission(AVMediaType.video))
-                    .subscribe {
-                        os_log("all permissions granted")
-                        self.callMode = .audioVideo
-                        self.showingAuviousSimpleConferenceView = true
-                    } onError: { (error) in
-                        os_log("permissions not granted: \(error.localizedDescription)")
-                        self.error = error
-                        self.showAlertFunction()
-                    } onDisposed: {
-                        os_log("permissions completable disposed")
-                    }
-                    .disposed(by: disposeBag)
-            })
-            .frame(width: 300, height: 33)
-            .padding(4)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke())
+            Text("Conference controls")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .padding(.vertical, 4)
+                .padding(.leading, 4)
+                .disabled(true) // To indicate it's not clickable
+            
+            VStack(spacing: 16) {
+                Toggle(isOn: $isCameraEnabled) {
+                    Text("camera")
+                        .font(.body)
+                }
+                Toggle(isOn: $isMicrophoneEnabled) {
+                    Text("microphone")
+                        .font(.body)
+                }
+                Toggle(isOn: $isSpeakerEnabled) {
+                    Text("speaker")
+                        .font(.body)
+                }
+                Toggle(isOn: $isCustomBackground) {
+                    Text("custom background")
+                        .font(.body)
+                }
+            }
         }
+        .padding()
+        .toggleStyle(SwitchToggleStyle(tint: .green))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .fullScreenCover(isPresented: $showingAuviousSimpleConferenceView, onDismiss: showAlertFunction) {
-            AuviousSimpleConferenceView(ticket: self.$ticket, callMode: self.$callMode, error: self.$error)
+            AuviousSimpleConferenceView(
+                ticket: self.$ticket,
+                callMode: self.$callMode,
+                cameraAvailable: self.$isCameraEnabled,
+                microphoneAvailable: self.$isMicrophoneEnabled,
+                speakerAvailable: self.$isSpeakerEnabled,
+                customBackground: self.$isCustomBackground,
+                speakerEnabled: self.$isAudioOutputToSpeaker,
+                error: self.$error)
         }
         .alert(isPresented: $showingAlert) {
             Alert(title: Text("Error"), message: Text("\(error?.localizedDescription ?? "unknown")"))
         }
     }
-
+    
     func showAlertFunction() {
         DispatchQueue.main.async {
             self.showingAlert = self.error != nil
         }
+    }
+    
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
@@ -112,3 +188,4 @@ struct ContentView_Previews: PreviewProvider {
         MainView()
     }
 }
+

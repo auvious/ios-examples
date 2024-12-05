@@ -12,6 +12,12 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Environment(\.presentationMode) var presentationMode
     @Binding var ticket: String
     @Binding var callMode: AuviousCallMode
+    @Binding var cameraAvailable: Bool
+    @Binding var microphoneAvailable: Bool
+    @Binding var speakerAvailable: Bool
+    @Binding var customBackground: Bool
+    @Binding var speakerEnabled: Bool
+    
     @Binding var error: Error?
     
     func makeUIViewController(context: Context) -> AuviousConferenceVCNew {
@@ -30,12 +36,12 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         conf.clientId = clientId
         conf.baseEndpoint = baseEndpoint
         conf.mqttEndpoint = mqttEndpoint
-        conf.conferenceBackgroundColor = .systemGray
-        conf.enableSpeaker = true
+        conf.conferenceBackgroundColor = customBackground ? .blue : .black
+        conf.enableSpeaker = speakerEnabled
         conf.callMode = .audioVideo
-        conf.cameraAvailable = true
-        conf.microphoneAvailable = true
-        conf.speakerAvailable = true
+        conf.cameraAvailable = cameraAvailable
+        conf.microphoneAvailable = microphoneAvailable
+        conf.speakerAvailable = speakerAvailable
         let vc = AuviousConferenceVCNew(configuration: conf, delegate: context.coordinator)
         return vc
     }
