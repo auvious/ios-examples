@@ -16,7 +16,7 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> AuviousConferenceVCNew {
         let clientId: String = "customer"
         let baseEndpoint: String = "https://auvious.video/"
-        let mqttEndpoint: String = "wss://events.auvious.video/ws"
+        let mqttEndpoint: String = "wss://auvious.video/ws"
         /*
         let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
         let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: .audioVideo)
