@@ -22,6 +22,7 @@ struct MainView: View {
     @State private var isMicrophoneEnabled = true
     @State private var isSpeakerEnabled = true
     @State private var isCustomBackground = false
+    @State private var environment = "auvious.video"
     
     
     private var disposeBag = DisposeBag()
@@ -39,6 +40,8 @@ struct MainView: View {
                 // Text Field
                 TextField("ticket", text: $ticket)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
                     .padding(.leading)
                 
                 // Dismiss Button
@@ -51,6 +54,12 @@ struct MainView: View {
                 }
             }
             .padding()
+            
+            TextField("environment", text: $environment)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true) 
+                .padding(.leading)
             
             HStack {
                 Button("Audio Call", action: {
@@ -165,6 +174,7 @@ struct MainView: View {
                 speakerAvailable: self.$isSpeakerEnabled,
                 customBackground: self.$isCustomBackground,
                 speakerEnabled: self.$isAudioOutputToSpeaker,
+                environment: self.$environment,
                 error: self.$error)
         }
         .alert(isPresented: $showingAlert) {

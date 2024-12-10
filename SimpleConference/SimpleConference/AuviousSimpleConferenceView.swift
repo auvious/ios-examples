@@ -17,17 +17,18 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Binding var speakerAvailable: Bool
     @Binding var customBackground: Bool
     @Binding var speakerEnabled: Bool
+    @Binding var environment: String
     
     @Binding var error: Error?
     
     func makeUIViewController(context: Context) -> AuviousConferenceVCNew {
-      
+        
         let clientId: String = "customer"
-        let baseEndpoint: String = "https://auvious.video/"
-        let mqttEndpoint: String = "wss://auvious.video/ws"
+        let baseEndpoint: String = "https://"+environment+"/"
+        let mqttEndpoint: String = "wss://"+environment+"/ws"
         /*
-        let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
-        let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: callMode)
+         let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
+         let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: callMode)
          */
         var conf = AuviousConferenceConfiguration()
         conf.username = ticket
@@ -38,7 +39,7 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         conf.mqttEndpoint = mqttEndpoint
         conf.conferenceBackgroundColor = customBackground ? .blue : .black
         conf.enableSpeaker = speakerEnabled
-        conf.callMode = .audioVideo
+        conf.callMode = callMode
         conf.cameraAvailable = cameraAvailable
         conf.microphoneAvailable = microphoneAvailable
         conf.speakerAvailable = speakerAvailable
