@@ -14,6 +14,39 @@ import AuviousSDK
 class ConferenceContainerViewController: UIViewController {
     var conferenceVC: AuviousConferenceVCNew?
 
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupPiPBackgroundView()
+    }
+
+    private func setupPiPBackgroundView() {
+        let background = UIView()
+        background.backgroundColor = .white
+        background.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(background)
+        NSLayoutConstraint.activate([
+            background.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            background.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            background.topAnchor.constraint(equalTo: view.topAnchor),
+            background.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+
+        let label = UILabel()
+        label.text = "Conference running in floating window"
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        label.textColor = .darkGray
+        label.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: background.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: background.trailingAnchor, constant: -24)
+        ])
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         guard let vc = conferenceVC, vc.parent == nil else { return }
@@ -70,7 +103,9 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         conf.clientId = clientId
         conf.baseEndpoint = baseEndpoint
         conf.mqttEndpoint = mqttEndpoint
-        conf.conferenceBackgroundColor = customBackground ? .blue : .black
+        if (customBackground){
+            conf.conferenceBackgroundColor = .black
+        }
         conf.enableSpeaker = speakerEnabled
         conf.callMode = callMode
         conf.cameraAvailable = cameraAvailable

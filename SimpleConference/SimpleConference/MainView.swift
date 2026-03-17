@@ -23,7 +23,7 @@ struct MainView: View {
     @State private var isSpeakerEnabled = true
     @State private var isScreenShareEnabled = true
     @State private var isPiPEnabled = true
-    @State private var isCustomBackground = true
+    @State private var isCustomBackground = false
     @State private var isBackgroundAudioEnabled = true
     @State private var environment = "auvious.video"
     
