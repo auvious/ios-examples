@@ -20,11 +20,17 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     /// The password property, used for logging in
     internal var password: String?
     
+    /// The participant name
+    internal var participantName: String?
+    
     /// The client id property, used for logging in
     internal var clientId: String?
     
     /// Map of parameters to be passed on login call
     internal var loginParams: [String: String]?
+    
+    /// UI Configuration
+    internal var uiConfiguration: AuviousConferenceConfiguration = AuviousConferenceConfiguration()
     
     public var isLoggedIn: Bool {
         return AuthenticationModule.sharedInstance.isLoggedIn
@@ -83,6 +89,29 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     /// Reference to the background task used for gracefully stopping streams
     private var backgroundTask: UIBackgroundTaskIdentifier = UIBackgroundTaskIdentifier.invalid
     
+    /// Internal flag for handling the iOS ReplayKit permission dialog app resume
+    internal var sharingMyScreen: Bool = false
+
+    /// Set to true while the ReplayKit permission dialog is being shown, cleared inside onApplicationResume.
+    /// This prevents a conference rejoin when the app briefly backgrounds during the dialog,
+    /// regardless of whether the completion handler fires before or after applicationDidBecomeActive.
+    internal var isPendingScreenSharePermission: Bool = false
+
+    /// Internal flag for handling the iOS Screenshot dialog app resume
+    internal var wasBackgroundedDueToScreenshot: Bool = false
+
+    /// True when peer connections are kept alive in background with audio still running
+    internal var isBackgroundAudioActive: Bool = false
+
+    /// GCD timer used for keep-alive while in background (RunLoop timers don't fire in background)
+    private var backgroundKeepAliveTimer: DispatchSourceTimer?
+
+    /// Whether the host app has declared the "audio" background mode in Info.plist
+    private var hostAppSupportsBackgroundAudio: Bool {
+        guard let modes = Bundle.main.infoDictionary?["UIBackgroundModes"] as? [String] else { return false }
+        return modes.contains("audio")
+    }
+
     //MARK: -
     //MARK: Pause/Resume handlers
     //MARK: -
@@ -93,24 +122,75 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         UIApplication.shared.endBackgroundTask(backgroundTask)
         backgroundTask = UIBackgroundTaskIdentifier.invalid
     }
+
+    /// Starts a GCD-based keep-alive timer for use in background (RunLoop timers don't fire).
+    private func startBackgroundKeepAliveTimer() {
+        let interval = UserEndpointModule.sharedInstance.keepAliveSeconds - 5
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
+        timer.schedule(deadline: .now() + interval, repeating: interval)
+        timer.setEventHandler {
+            UserEndpointModule.sharedInstance.performKeepAlive()
+        }
+        timer.resume()
+        backgroundKeepAliveTimer = timer
+    }
+
+    /// Cancels the GCD-based background keep-alive timer.
+    private func stopBackgroundKeepAliveTimer() {
+        backgroundKeepAliveTimer?.cancel()
+        backgroundKeepAliveTimer = nil
+    }
     
     /**
      Should be called when the application is backgrounded in order to gracefully
      disconnect from remote streams.
      */
     public func onApplicationPause(){
+        // Background audio path: keep peer connections alive, pause only video
+        if uiConfiguration.backgroundAudioEnabled && hostAppSupportsBackgroundAudio && currentConference != nil && !sharingMyScreen {
+            isBackgroundAudioActive = true
+            rtcClient?.pauseVideoForBackground()
+
+            // Switch from RunLoop timer (won't fire in background) to GCD timer
+            UserEndpointModule.sharedInstance.keepAliveTimer?.invalidate()
+            startBackgroundKeepAliveTimer()
+
+            backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+                // OS is about to kill us — fall back to full teardown
+                self?.stopBackgroundKeepAliveTimer()
+                self?.isBackgroundAudioActive = false
+                if let conf = self?.currentConference {
+                    self?.leaveConference(conferenceId: conf.id, onSuccess: {
+                        self?.endBackgroundTask()
+                    }, onFailure: { _ in
+                        self?.endBackgroundTask()
+                    })
+                } else {
+                    self?.endBackgroundTask()
+                }
+            }
+
+            os_log("Background audio active — keeping peer connections alive", log: Log.conferenceSDK, type: .debug)
+            return
+        }
+
+        if uiConfiguration.backgroundAudioEnabled && !hostAppSupportsBackgroundAudio {
+            os_log("backgroundAudioEnabled is true but UIBackgroundModes 'audio' is missing from Info.plist — falling back to full teardown", log: Log.conferenceSDK, type: .error)
+        }
+
+        // Existing full teardown path
         backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
             self?.endBackgroundTask()
         }
-        
+
         //Pause the keepAlive timer
         UserEndpointModule.sharedInstance.keepAliveTimer?.invalidate()
-        
+
         if let conf = currentConference {
             leaveConference(conferenceId: conf.id, onSuccess: {
-                
+
                 self.endBackgroundTask()
-                
+
             }, onFailure: {(error) in
                 self.endBackgroundTask()
             })
@@ -124,21 +204,41 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      rejoin the conference and reconnect to remote streams.
      */
     public func onApplicationResume(){
+        // Background audio path: connections are still alive, just resume video
+        if isBackgroundAudioActive {
+            os_log("Resuming from background audio — restoring video", log: Log.conferenceSDK, type: .debug)
+            isBackgroundAudioActive = false
+            stopBackgroundKeepAliveTimer()
+            UserEndpointModule.sharedInstance.startKeepAliveTimer()
+            rtcClient?.resumeVideoForForeground()
+            endBackgroundTask()
+            delegate?.auviousSDK(didResumeFromBackground: true)
+            return
+        }
+
         //Ensure we have logged in, and have created an endpoint
         guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse, let userId = loginResponse.userId else {
             return
         }
-        
+
         guard let userEndpointId = UserEndpointModule.sharedInstance.userEndpointId else {
+            return
+        }
+
+        //Ensure we are not resuming due to ReplayKit permission dialog closure
+        guard !sharingMyScreen && !wasBackgroundedDueToScreenshot && !isPendingScreenSharePermission else {
+            print("onApplicationResume() called but we are sharing our screen / resuming from screenshot / pending screen share permission so no rejoin")
+            wasBackgroundedDueToScreenshot = false
+            isPendingScreenSharePermission = false
             return
         }
         
         //Check if endpoint is alive
         UserEndpointModule.sharedInstance.keepAliveRequest = KeepAliveRequest(userEndpointId: userEndpointId, userId: userId)
-        API.sharedInstance.keepAlive(UserEndpointModule.sharedInstance.keepAliveRequest!, onSuccess: {(json) in
+        API2.sharedInstance.keepAlive(UserEndpointModule.sharedInstance.keepAliveRequest!, onSuccess: {(json) in
             if let _ = json {
                 UserEndpointModule.sharedInstance.startKeepAliveTimer()
-                MQTTModule.sharedInstance.reconnect()
+                MQTTModule2.sharedInstance.reconnect()
                 
                 //Rejoin conference if needed
                 if let rejoinId = self.lastConferenceJoined {
@@ -164,17 +264,27 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     }
     
     /**
+     Configures the Auvious SDK with the necessary UI settings.
+     
+     - Parameter config: The UI configuration
+     */
+    public func setUIConfiguration(config: AuviousConferenceConfiguration) {
+        self.uiConfiguration = config
+    }
+    
+    /**
      Configures the Auvious SDK with the necessary user and server settings.
      
      - Parameter username: The username
      - Parameter password: The password
      - Parameter clientId: The client id used for authentication
      */
-    public func configure(params: [String: String], username: String, password: String, clientId: String, baseEndpoint: String, mqttEndpoint: String) {
+    public func configure(params: [String: String], username: String, password: String, name: String?, clientId: String, baseEndpoint: String, mqttEndpoint: String) {
         self.loginParams = params
         self.username = username
         self.password = password
         self.clientId = clientId
+        self.participantName = name
         
         ServerConfiguration.baseRTC = baseEndpoint
         ServerConfiguration.baseMeeting = baseEndpoint
@@ -223,6 +333,20 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     //MARK: SDK Conference functions
     //MARK: -
     
+    public func startScreenSharingFlow() throws -> String? {
+        guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse, let userId = loginResponse.userId else {
+            throw AuviousSDKError.notLoggedIn
+        }
+        
+        guard let endpointId = UserEndpointModule.sharedInstance.userEndpointId else {
+            throw AuviousSDKError.endpointNotCreated
+        }
+        
+        let streamId = UUID().uuidString
+        
+        return streamId
+    }
+    
     /**
      Starts the publish stream flow for the specified type. Returns the stream id.
      Success/Failure handled with delegation using the AuviousSDKDelegate
@@ -231,6 +355,17 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      - Returns: The id of the stream that you are about to publish
      - Throws: AuviousSDKError detailing the error
      */
+    /// Requests screen share permission by starting ReplayKit capture.
+    /// The completion is called on the ReplayKit callback thread with true if the user allowed, false if denied.
+    /// On success, the pending capturer is reused when startPublishLocalStreamFlow(type: .screen) is called.
+    public func requestScreenSharePermission(completion: @escaping (Bool) -> Void) {
+        // Set flag before the dialog appears. It is cleared inside onApplicationResume,
+        // so the guard there fires regardless of whether the ReplayKit completion
+        // handler runs before or after applicationDidBecomeActive.
+        isPendingScreenSharePermission = true
+        rtcClient.startScreenCapture(completion: completion)
+    }
+
     public func startPublishLocalStreamFlow(type: StreamType) throws -> String? {
         
         guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse, let userId = loginResponse.userId else {
@@ -239,6 +374,10 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         
         guard let endpointId = UserEndpointModule.sharedInstance.userEndpointId else {
             throw AuviousSDKError.endpointNotCreated
+        }
+        
+        if type == .screen {
+            sharingMyScreen = true
         }
         
         let streamId = UUID().uuidString
@@ -267,6 +406,10 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         
         guard let _ = currentConference else {
             throw AuviousSDKError.notInConference
+        }
+        
+        if streamType == .screen {
+            sharingMyScreen = false
         }
         
         delegate?.auviousSDK(didChangeState: .localStreamIsDisconnecting, streamId: streamId, streamType: streamType, endpointId:userEndpointId)
@@ -301,8 +444,12 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             throw AuviousSDKError.notInConference
         }
         
+        if streamType == .screen {
+            rtcClient.stopScreenSharing()
+        }
+        
         let usRequest = UnpublishStreamRequest(conferenceId: conference.id, streamId: streamId, userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.unpublishStream(usRequest, onSuccess: {(json) in
+        API2.sharedInstance.unpublishStream(usRequest, onSuccess: {(json) in
             
             if let _ = json {
                 self.delegate?.auviousSDK(didChangeState: .localStreamDisconnected, streamId: streamId, streamType: streamType, endpointId:endpointId)
@@ -322,7 +469,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
                 if peerConnection.isLocal == true {
                     if let conference = currentConference {
                         let usRequest = UnpublishStreamRequest(conferenceId: conference.id, streamId: peerConnection.streamId, userEndpointId: peerConnection.endpointId, userId: peerConnection.userId)
-                        API.sharedInstance.unpublishStream(usRequest, onSuccess: {(json) in
+                        API2.sharedInstance.unpublishStream(usRequest, onSuccess: {(json) in
                             
                             if let _ = json {
                                 //success
@@ -384,7 +531,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         self.delegate?.auviousSDK(didChangeState: .remoteStreamIsDisconnecting, streamId: streamId, streamType: streamType, endpointId:remoteEndpointId)
         
         let svsRequest = StopViewStreamRequest(conferenceId: conference.id, streamId: streamId, userEndpointId: remoteEndpointId, userId: remoteUserId, viewerId: endpointId)
-        API.sharedInstance.stopViewStream(svsRequest, onSuccess: {(response) in
+        API2.sharedInstance.stopViewStream(svsRequest, onSuccess: {(response) in
             
             if let _ = response {
                 self.delegate?.auviousSDK(didChangeState: .remoteStreamDisconnected, streamId: streamId, streamType: streamType, endpointId:remoteEndpointId)
@@ -414,7 +561,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
                     
                     if let _ = UserEndpointModule.sharedInstance.userEndpointId, let conference = currentConference, let viewerId = self.viewerIdMap[peerConnection.streamId] {
                         let svsRequest = StopViewStreamRequest(conferenceId: conference.id, streamId: peerConnection.streamId, userEndpointId: peerConnection.endpointId, userId: peerConnection.userId, viewerId: viewerId)
-                        API.sharedInstance.stopViewStream(svsRequest, onSuccess: {(response) in
+                        API2.sharedInstance.stopViewStream(svsRequest, onSuccess: {(response) in
                             //success
                         }, onFailure: {(error) in
                             let streamId = String(describing: peerConnection.streamId)
@@ -465,7 +612,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         let request = CreateConferenceRequest(conferenceId: conferenceId, creatorId: userId, creatorEndpoint: endpointId, mode: mode)
-        API.sharedInstance.createConference(request, onSuccess: {(json) in
+        API2.sharedInstance.createConference(request, onSuccess: {(json) in
             if let data = json {
                 let conference = ConferenceSummary(fromJson: data)
                 onSuccess(conference)
@@ -494,13 +641,13 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             return
         }
         
-        let request = JoinConferenceRequest(conferenceId: conferenceId, userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.joinConference(request, onSuccess: {(json) in
+        let request = JoinConferenceRequest(conferenceId: conferenceId, userEndpointId: endpointId, userId: userId, participantName: participantName)
+        API2.sharedInstance.joinConference(request, onSuccess: {(json) in
             if json != nil {
                 
                 os_log("Joined conference %@", log: Log.conferenceSDK, type: .debug, conferenceId)
                 //Retrieve and store the current conference state
-                API.sharedInstance.getConferenceSimpleView(conferenceId, onSuccess: {(json) in
+                API2.sharedInstance.getConferenceSimpleView(conferenceId, onSuccess: {(json) in
                     if let data = json {
                         
                         self.currentConference = ConferenceSimpleView(fromJson: data)
@@ -515,9 +662,14 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
                                 #warning("TODO: Extra val here")
                                 self.delegateConferenceMessage(msg: m)
                             }
-                            
+
                             os_log("Finished processing of %d cached messages", log: Log.conferenceSDK, type: .debug, self.mqttCachedMessages.count)
                             self.mqttCachedMessages.removeAll()
+                        }
+
+                        //Notify if recording was already active when we joined
+                        if self.currentConference?.isRecording == true {
+                            self.delegate?.auviousSDK(recorderStateChanged: true)
                         }
                     }
                 }, onFailure: {(error) in
@@ -538,7 +690,10 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      - Parameter onFailure: Called in case of failure with the designated Error
      */
     public func leaveConference(conferenceId: String, onSuccess: @escaping ()->(), onFailure: @escaping (Error)->()) {
-        
+        // Clean up background audio state if active
+        isBackgroundAudioActive = false
+        stopBackgroundKeepAliveTimer()
+
         //Step 1 - Close all streams
         removeAllStreams()
         
@@ -568,7 +723,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         let lcRequest = LeaveConferenceRequest(conferenceId: conferenceId, reason: "", userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.leaveConference(lcRequest, onSuccess: {(json) in
+        API2.sharedInstance.leaveConference(lcRequest, onSuccess: {(json) in
             
             if let _ = json {
                 self.currentConference = nil
@@ -619,7 +774,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         let ecRequest = EndConferenceRequest(conferenceId: conferenceId, reason: "", userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.endConference(ecRequest, onSuccess: {(json) in
+        API2.sharedInstance.endConference(ecRequest, onSuccess: {(json) in
             
             if let _ = json {
                 self.currentConference = nil
@@ -663,12 +818,12 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
                 //Server configuration has already been retrieved
                 AuviousConferenceSDK.sharedInstance.initializeARTCClient()
                 
-                MQTTModule.sharedInstance.configure(endpointId: endpoint)
-                MQTTModule.sharedInstance.conferenceDelegate = self
-                MQTTModule.sharedInstance.connect(onSubscription: {
+                MQTTModule2.sharedInstance.configure(endpointId: endpoint)
+                MQTTModule2.sharedInstance.conferenceDelegate = self
+                MQTTModule2.sharedInstance.connect(onSubscription: {
                     onLoginSuccess(endpointId, conferenceId)
                     //We no longer want the closure to be called
-                    MQTTModule.sharedInstance.clearSubscriptionCallback()
+                    MQTTModule2.sharedInstance.clearSubscriptionCallback()
                 })
             }
         }, onFailure: {error in
@@ -752,7 +907,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     /// Cleanup state
     private func cleanState(){
         UserEndpointModule.sharedInstance.stopKeepAliveTimer()
-        MQTTModule.sharedInstance.disconnect()
+        MQTTModule2.sharedInstance.disconnect()
         self.currentConference = nil
     }
     
@@ -802,7 +957,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         let request = UpdateMetadataRequest(conferenceId: conferenceId, streamId: streamId, userEndpointId: endpointId, operation: operation, type: type, value: isEnabled ? "false" : "true")
         
         //Call the api
-        API.sharedInstance.updateConferenceMetadata(request, onSuccess: {json in
+        API2.sharedInstance.updateConferenceMetadata(request, onSuccess: {json in
             if let _ = json {
                 os_log("toggleLocalStream() success API", log: Log.conferenceSDK, type: .debug)
                 
@@ -1046,9 +1201,9 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             return
         }
         
-        let psRequest:PublishStreamRequest = PublishStreamRequest(conferenceId: conference.id, streamType: streamType, sdpOffer: sdpOffer, streamId: streamId, userEndpointId: endpointId, userId: userId)
+        let psRequest: PublishStreamRequest = PublishStreamRequest(conferenceId: conference.id, streamType: streamType, sdpOffer: sdpOffer, streamId: streamId, userEndpointId: endpointId, userId: userId, participantName: self.participantName)
         
-        API.sharedInstance.publishStream(psRequest, onSuccess:{(conferencePublishResult) in
+        API2.sharedInstance.publishStream(psRequest, onSuccess:{(conferencePublishResult) in
             
             if let data = conferencePublishResult {
                 let response = PublishStreamResponse(fromJson: data)
@@ -1077,7 +1232,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         self.viewerIdMap[streamId] = viewerId
         let vsRequest:ViewStreamRequest = ViewStreamRequest(conferenceId: conference.id, sdpOffer: sdpOffer, streamId: streamId, userEndpointId: remoteEndpointId, userId: remoteUserId, viewerId: viewerId)
         
-        API.sharedInstance.viewStream(vsRequest, onSuccess:{(conferenceViewResult) in
+        API2.sharedInstance.viewStream(vsRequest, onSuccess:{(conferenceViewResult) in
             
             if let data = conferenceViewResult {
                 let response = ViewStreamResponse(fromJson: data)
@@ -1115,7 +1270,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         let psicRequest = PublishStreamIceCandidatesRequest(conferenceId: conference.id, candidates: candidatesArray, streamId: streamId, userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.addPublishStreamIceCandidates(psicRequest, onSuccess: {(json) in
+        API2.sharedInstance.addPublishStreamIceCandidates(psicRequest, onSuccess: {(json) in
             
             self.delegate?.auviousSDK(didChangeState: .localStreamConnected, streamId: streamId, streamType: streamType, endpointId:endpointId)
             
@@ -1144,7 +1299,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         let vsicRequest = ViewStreamIceCandidatesRequest(conferenceId: conference.id, candidates: candidatesArray, streamId: streamId, userEndpointId: endpointId, userId: userId, viewerId: viewerId)
-        API.sharedInstance.addViewStreamIceCandidates(vsicRequest, onSuccess: {(json) in
+        API2.sharedInstance.addViewStreamIceCandidates(vsicRequest, onSuccess: {(json) in
             
             self.delegate?.auviousSDK(didChangeState: .remoteStreamConnected, streamId: streamId, streamType: streamType, endpointId:endpointId)
             
@@ -1167,4 +1322,16 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     
     //Not needed for conferences
     func rtcClient(agentSwitchedCamera toFront: Bool) {}
+    
+    internal func rtcClient(didStopScreenSharing: Bool) {
+        delegate?.auviousSDK(screenSharingStopped: true)
+    }
+    
+    internal func rtcClient(didStartScreenSharing: Bool) {
+        delegate?.auviousSDK(screenSharingStarted: true)
+    }
+
+    internal func rtcClient(didFailToStartScreenSharing: Bool) {
+        sharingMyScreen = false
+    }
 }

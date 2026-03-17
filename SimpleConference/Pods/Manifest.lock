@@ -1,27 +1,26 @@
 PODS:
-  - Alamofire (4.9.1)
-  - AuviousGoogleWebRTC (84.4147.2)
-  - AuviousSDK (1.3.1):
-    - Alamofire (~> 4.7)
-    - AuviousGoogleWebRTC (~> 84.4147.2)
-    - MQTTClient/Websocket (~> 0.15)
-    - SocketRocket (~> 0.5.1)
+  - AuviousGoogleWebRTC (84.4147.4)
+  - AuviousSDK (1.4.0-rc.1):
+    - AuviousGoogleWebRTC (~> 84.4147.4)
+    - CocoaMQTTWebsocket_IOS13
+    - MqttCocoaAsyncSocket_IOS13 (~> 14.0.0)
+    - Starscream_IOS13 (~> 4.0.4)
     - SwiftyJSON (~> 5.0)
-  - MQTTClient/Min (0.15.3)
-  - MQTTClient/Websocket (0.15.3):
-    - MQTTClient/Min
-    - SocketRocket
+  - CocoaMQTTWebsocket_IOS13 (14.0.0):
+    - MqttCocoaAsyncSocket_IOS13 (~> 14.0)
+    - Starscream_IOS13 (~> 4.0)
+  - MqttCocoaAsyncSocket_IOS13 (14.0.0)
   - RxCocoa (6.1.0):
     - RxRelay (= 6.1.0)
     - RxSwift (= 6.1.0)
   - RxRelay (6.1.0):
     - RxSwift (= 6.1.0)
   - RxSwift (6.1.0)
-  - SocketRocket (0.5.1)
+  - Starscream_IOS13 (4.0.4)
   - SwiftyJSON (5.0.2)
 
 DEPENDENCIES:
-  - AuviousSDK (= 1.3.1)
+  - AuviousSDK (= 1.4.0-rc.1)
   - RxCocoa (= 6.1.0)
   - RxSwift (= 6.1.0)
 
@@ -29,26 +28,26 @@ SPEC REPOS:
   https://github.com/auvious/CocoaPodSpecs.git:
     - AuviousGoogleWebRTC
     - AuviousSDK
+    - CocoaMQTTWebsocket_IOS13
+    - MqttCocoaAsyncSocket_IOS13
+    - Starscream_IOS13
   trunk:
-    - Alamofire
-    - MQTTClient
     - RxCocoa
     - RxRelay
     - RxSwift
-    - SocketRocket
     - SwiftyJSON
 
 SPEC CHECKSUMS:
-  Alamofire: 85e8a02c69d6020a0d734f6054870d7ecb75cf18
-  AuviousGoogleWebRTC: e5a8ede1fb2e5e7a3e75f9a871c08dff7678f963
-  AuviousSDK: df853323155d4af3917b0722d898eb58ddd25bf7
-  MQTTClient: 0dfa04e789479c2e461786464969895c1fcb0875
+  AuviousGoogleWebRTC: 146e1bcb5423fbef3796d1e2cd28c7c592ae575a
+  AuviousSDK: 5e9d20ac9455eac3ad09ddd06d68588daa12177b
+  CocoaMQTTWebsocket_IOS13: 7f2f31fe4600b2fc0e22c394b56d49da8c32bdef
+  MqttCocoaAsyncSocket_IOS13: 31443ca4459930895238e95aecbd0f2fbe0464f6
   RxCocoa: 5c51f02d562cbd94629f6c26cf0c80fe4ab8d343
   RxRelay: 483e1a19fad961b41f0b0c0bee506f46c1ae14fe
   RxSwift: a834e5c538e89eca0cae86f403f4fbf0336786ce
-  SocketRocket: d57c7159b83c3c6655745cd15302aa24b6bae531
+  Starscream_IOS13: f25f0b90f90e8d4ea4e21b6a8268264745e75000
   SwiftyJSON: f5b1bf1cd8dd53cd25887ac0eabcfd92301c6a5a
 
-PODFILE CHECKSUM: b92da807a4df6253c7eac7b8698dd97224b48657
+PODFILE CHECKSUM: 2ac67a4f3985c18394a0c049a84203c8e6169927
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2

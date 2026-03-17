@@ -17,6 +17,9 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Binding var speakerAvailable: Bool
     @Binding var customBackground: Bool
     @Binding var speakerEnabled: Bool
+    @Binding var pipEnabled: Bool
+    @Binding var screenShareEnabled: Bool
+    @Binding var backgroundAudioEnabled: Bool
     @Binding var environment: String
     
     @Binding var error: Error?
@@ -25,7 +28,7 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         
         let clientId: String = "customer"
         let baseEndpoint: String = "https://"+environment+"/"
-        let mqttEndpoint: String = "wss://"+environment+"/ws"
+        let mqttEndpoint: String = environment
         /*
          let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
          let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: callMode)
@@ -43,6 +46,9 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         conf.cameraAvailable = cameraAvailable
         conf.microphoneAvailable = microphoneAvailable
         conf.speakerAvailable = speakerAvailable
+        conf.pipAvailable = pipEnabled
+        conf.screenSharingAvailable = screenShareEnabled
+        conf.backgroundAudioEnabled = backgroundAudioEnabled
         let vc = AuviousConferenceVCNew(configuration: conf, delegate: context.coordinator)
         return vc
     }

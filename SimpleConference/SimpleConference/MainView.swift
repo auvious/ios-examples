@@ -21,7 +21,10 @@ struct MainView: View {
     @State private var isCameraEnabled = true
     @State private var isMicrophoneEnabled = true
     @State private var isSpeakerEnabled = true
+    @State private var isScreenShareEnabled = false
+    @State private var isPiPEnabled = false
     @State private var isCustomBackground = false
+    @State private var isBackgroundAudioEnabled = false
     @State private var environment = "auvious.video"
     
     
@@ -156,8 +159,20 @@ struct MainView: View {
                     Text("speaker")
                         .font(.body)
                 }
+                Toggle(isOn: $isScreenShareEnabled) {
+                    Text("share screen")
+                        .font(.body)
+                }
+                Toggle(isOn: $isPiPEnabled) {
+                    Text("Floating window")
+                        .font(.body)
+                }
                 Toggle(isOn: $isCustomBackground) {
                     Text("custom background")
+                        .font(.body)
+                }
+                Toggle(isOn: $isBackgroundAudioEnabled) {
+                    Text("background audio")
                         .font(.body)
                 }
             }
@@ -174,6 +189,9 @@ struct MainView: View {
                 speakerAvailable: self.$isSpeakerEnabled,
                 customBackground: self.$isCustomBackground,
                 speakerEnabled: self.$isAudioOutputToSpeaker,
+                pipEnabled: self.$isPiPEnabled,
+                screenShareEnabled: self.$isScreenShareEnabled,
+                backgroundAudioEnabled: self.$isBackgroundAudioEnabled,
                 environment: self.$environment,
                 error: self.$error)
         }

@@ -25,7 +25,7 @@ internal class UserEndpointModule {
     internal static let sharedInstance = UserEndpointModule()
     
     /// Configuration setting for the keep alive timer
-    private let keepAliveSeconds: Double = 15
+    internal let keepAliveSeconds: Double = 15
     
     /// Endpoint keep alive timer
     internal var keepAliveTimer: Timer?
@@ -45,7 +45,7 @@ internal class UserEndpointModule {
     internal func createEndpoint(newEndpointId: String, userId: String, onSuccess: @escaping (String)->(), onFailure: @escaping (Error)->()){
         let ceRequest = CreateEndpointRequest(keepAliveSeconds: Int(self.keepAliveSeconds), userEndpointId: newEndpointId, userId: userId)
         
-        API.sharedInstance.createEndpoint(ceRequest, onSuccess: {(json) in
+        API2.sharedInstance.createEndpoint(ceRequest, onSuccess: {(json) in
             
             if let data = json {
                 self.userEndpointId = data["id"].stringValue
@@ -65,7 +65,7 @@ internal class UserEndpointModule {
     
     internal func destroyEndpoint(endpointId: String, userId: String, onSuccess: @escaping ()->(), onFailure: @escaping (Error)->()) {
         let uRequest = UnregisterEndpointRequest(reason: "User logout", userEndpointId: endpointId, userId: userId)
-        API.sharedInstance.unregisterEndpoint(uRequest, onSuccess: {(json) in
+        API2.sharedInstance.unregisterEndpoint(uRequest, onSuccess: {(json) in
             
             self.stopKeepAliveTimer()
             onSuccess()
@@ -93,10 +93,15 @@ internal class UserEndpointModule {
     
     //Keep alive timer tick
     @objc private func onKeepAliveTick(timer: Timer) {
+        performKeepAlive()
+    }
+
+    /// Fires a keep-alive request. Called by the RunLoop timer and also by the GCD background timer.
+    internal func performKeepAlive() {
         guard let userEndpointId = userEndpointId, let loginResponse = AuthenticationModule.sharedInstance.loginResponse else {
             return
         }
-        
+
         if let request = keepAliveRequest {
             fireKeepAliveRequest(request)
         } else {
@@ -107,7 +112,7 @@ internal class UserEndpointModule {
     
     //Fires the keep alive rest call
     private func fireKeepAliveRequest(_ request: KeepAliveRequest) {
-        API.sharedInstance.keepAlive(request, onSuccess: {(json) in
+        API2.sharedInstance.keepAlive(request, onSuccess: {(json) in
             if let _ = json {
                 //os_log("Keep Alive Success", log: Log.auth, type: .debug)
             }

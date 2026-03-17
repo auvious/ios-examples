@@ -23,6 +23,9 @@ internal protocol RTCDelegate {
     func rtcClient(didChangeState newState: StreamEventState, streamId: String, streamType: StreamType, endpointId: String)
     func rtcClient(agentSwitchedCamera toFront: Bool)
     func rtcClient(recorderStateChanged toActive: Bool)
+    func rtcClient(didStopScreenSharing: Bool)
+    func rtcClient(didStartScreenSharing: Bool)
+    func rtcClient(didFailToStartScreenSharing: Bool)
     
     //rest call
     func rtcClient(call streamId: String, sdpOffer: String, target: String)
@@ -87,6 +90,7 @@ internal extension RTCDelegate {
     func rtcClient(addPublishStreamIceCandidates candidates: [RTCIceCandidate], streamId: String, streamType: StreamType) {}
     func rtcClient(addRemoteStreamIceCandidates candidates: [RTCIceCandidate], userId: String, endpointId: String, streamId: String, streamType: StreamType) {}
     func rtcClient(recorderStateChanged toActive: Bool){}
+    func rtcClient(didFailToStartScreenSharing: Bool){}
 }
 
 internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCapturerDelegate {
@@ -99,6 +103,16 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     
     //Default connection constraint, used when instatiating a connection
     private let defaultConnectionConstraint = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
+    
+    //Screen capturing
+    private var screenCapturer: ScreenCapturer!
+    private var localScreenVideoSource: RTCVideoSource?
+    private var localScreenVideoTrack: RTCVideoTrack?
+    private var localScreenStream: RTCMediaStream?
+
+    // Pending capturer created during the permission phase (reused in createScreenSharingStream)
+    private var pendingScreenVideoSource: RTCVideoSource?
+    private var pendingScreenCapturer: ScreenCapturer?
     
     private var capturer: RTCCameraVideoCapturer!
     private var localVideoSource: RTCVideoSource?
@@ -118,6 +132,10 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     //Latest local captured frame
     private var lastLocalFrame: RTCVideoFrame?
     private var capturingScreenshot: Bool = false
+
+    /// Stores the last speaker preference set via changeAudioRoot().
+    /// Used by checkCurrentAudioRoute() so it doesn't override the user's choice.
+    private var audioPrefersSpeaker: Bool = true
     
     //Local tracks (for muting/unmuting)
     internal var localVideoTrack: RTCVideoTrack?
@@ -254,7 +272,7 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
         }
         
         peerConnections.append(connectionContainer)
-        os_log("Created connection for stream type", log: Log.rtc, type: .debug, type.rawValue)
+        os_log("Created connection for stream type %@", log: Log.rtc, type: .debug, type.rawValue)
     }
     
     //Returns the connection created for the given stream id, if any
@@ -274,8 +292,63 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
             return
         }
         
-        let localStream = createLocalMediaStream(type: type, streamId: streamId)
-        peerConnection.add(localStream)
+        if type == .screen {
+            let screenStream = createScreenSharingStream(streamId: streamId)
+            peerConnection.add(screenStream)
+        } else {
+            let localStream = createLocalMediaStream(type: type, streamId: streamId)
+            peerConnection.add(localStream)
+        }
+    }
+    
+    /// Starts ReplayKit capture to trigger the permission dialog.
+    /// The capturer is stored as pending and reused in createScreenSharingStream.
+    internal func startScreenCapture(completion: @escaping (Bool) -> Void) {
+        pendingScreenVideoSource = factory.videoSource()
+        let capturer = ScreenCapturer(videoSource: pendingScreenVideoSource!)
+        capturer.delegate = self
+        pendingScreenCapturer = capturer
+        capturer.permissionCompletion = { [weak self] granted in
+            guard let self = self else { return }
+            if !granted {
+                self.pendingScreenCapturer = nil
+                self.pendingScreenVideoSource = nil
+            }
+            completion(granted)
+        }
+        capturer.start()
+    }
+
+    internal func createScreenSharingStream(streamId: String) -> RTCMediaStream {
+        os_log("createLocalMediaStream() for type screen and stream %@", log: Log.rtc, type: .debug, streamId)
+        localScreenStream = factory.mediaStream(withStreamId: streamId)
+
+        if let pending = pendingScreenCapturer, let pendingSource = pendingScreenVideoSource {
+            // Reuse the capturer that was already started during the permission phase
+            screenCapturer = pending
+            localScreenVideoSource = pendingSource
+            pendingScreenCapturer = nil
+            pendingScreenVideoSource = nil
+            // Capture is already running; notify delegate directly
+            delegate?.rtcClient(didStartScreenSharing: true)
+        } else {
+            localScreenVideoSource = factory.videoSource()
+            screenCapturer = ScreenCapturer(videoSource: localScreenVideoSource!)
+            screenCapturer.delegate = self
+            screenCapturer.start()
+        }
+
+        localScreenVideoTrack = factory.videoTrack(with: localScreenVideoSource!, trackId: "screenVideo")
+        localScreenVideoTrack!.isEnabled = true
+        localScreenStream!.addVideoTrack(localScreenVideoTrack!)
+
+        return localScreenStream!
+    }
+    
+    internal func stopScreenSharing() {
+        os_log("stopScreenSharing() for type screen and stream %@", log: Log.rtc, type: .debug, localScreenStream ?? "nil")
+        delegate?.rtcClient(didStopScreenSharing: true)
+        screenCapturer?.stop()
     }
     
     internal func createLocalMediaStream(type: StreamType, streamId: String) -> RTCMediaStream {
@@ -455,7 +528,7 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     
     private func invokeAnswer(callId: String, sdpAnswer: String, userEndpointId: String, userId: String, container: RTCPeerConnectionContainer) {
         let object = CallAnswerRequest(callId: callId, sdpAnswer: sdpAnswer, userEndpointId: userEndpointId, userId: userId)
-        API.sharedInstance.answerCall(object, onSuccess: {(json) in
+        API2.sharedInstance.answerCall(object, onSuccess: {(json) in
             
             if let _ = json {
                 
@@ -468,7 +541,7 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
                     }
                     
                     let iceCandidatesRequest = CallIceCandidatesRequest(callId: callId, candidates: candidatesArray, userEndpointId: userEndpointId, userId: userId)
-                    API.sharedInstance.addCallIceCandidates(iceCandidatesRequest, onSuccess: {(json) in
+                    API2.sharedInstance.addCallIceCandidates(iceCandidatesRequest, onSuccess: {(json) in
                         
                         if let _ = json {
                             //success
@@ -554,7 +627,7 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
                     }
                     
                     let iceCandidatesRequest = CallIceCandidatesRequest(callId: event.callId, candidates: candidatesArray, userEndpointId: userEndpointId, userId: userId)
-                    API.sharedInstance.addCallIceCandidates(iceCandidatesRequest, onSuccess: {(json) in
+                    API2.sharedInstance.addCallIceCandidates(iceCandidatesRequest, onSuccess: {(json) in
                         
                         if let _ = json {
                             //success
@@ -743,12 +816,12 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
             if description.portType == AVAudioSession.Port.headphones || description.portType == AVAudioSession.Port.bluetoothHFP {
                 os_log("headphone plugged in", log: Log.rtc, type: .debug)
             } else {
-                os_log("headphone pulled out", log: Log.rtc, type: .debug)
-                changeAudioRoot(toSpeaker: true)
+                os_log("headphone pulled out, flag:%{public}@", log: Log.rtc, type: .debug, String(audioPrefersSpeaker))
+                changeAudioRoot(toSpeaker: audioPrefersSpeaker)
             }
         }
     }
-    
+
     @objc func handleRouteChange(notification: Notification) {
         guard let userInfo = notification.userInfo,
             let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
@@ -961,6 +1034,52 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
         }
     }
     
+    // MARK: - Background audio support
+
+    /// Pauses video capture and disables remote video tracks while keeping audio and peer connections alive.
+    internal func pauseVideoForBackground() {
+        // Pause local video capture (keep capturer reference alive for resume)
+        localVideoTrack?.isEnabled = false
+        if capturer != nil {
+            capturer.stopCapture()
+        }
+
+        // Disable remote video tracks to prevent GPU work in background
+        for container in peerConnections where !container.isLocal {
+            for receiver in container.connection.receivers {
+                if receiver.track?.kind == "video" {
+                    receiver.track?.isEnabled = false
+                }
+            }
+        }
+
+        // Ensure audio session stays active
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    /// Resumes video capture and re-enables remote video tracks after returning from background.
+    internal func resumeVideoForForeground() {
+        // Re-enable local video track and restart capture
+        localVideoTrack?.isEnabled = true
+        if capturer != nil {
+            let position = usingFrontCamera ? AVCaptureDevice.Position.front : AVCaptureDevice.Position.back
+            if let device = findDeviceForPosition(position: position) {
+                let format = selectFormatForDevice(device: device)
+                let fps = selectFpsForFormat(format: format)
+                capturer.startCapture(with: device, format: format, fps: fps)
+            }
+        }
+
+        // Re-enable remote video tracks
+        for container in peerConnections where !container.isLocal {
+            for receiver in container.connection.receivers {
+                if receiver.track?.kind == "video" {
+                    receiver.track?.isEnabled = true
+                }
+            }
+        }
+    }
+
     @discardableResult
     internal func switchCamera(fromRemoteAgent: Bool = false) -> CameraResponse {
         //#warning("Feature Idea: Change mic direction when user is switching camera (https://www.twilio.com/docs/video/ios-v2-configuring-audio-video-inputs-and-outputs)")
@@ -1012,6 +1131,7 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     
     @discardableResult
     internal func changeAudioRoot(toSpeaker: Bool) -> Bool {
+        audioPrefersSpeaker = toSpeaker
         //#warning("Feature Idea: Change audio session type for better audio quality (https://www.twilio.com/docs/video/ios-v2-configuring-audio-video-inputs-and-outputs)")
         if toSpeaker {
             do {
@@ -1031,5 +1151,19 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
                 return false
             }
         }
+    }
+}
+
+extension RTCModule: ScreenCapturerDelegate {
+    func onScreenSharingStart() {
+        delegate?.rtcClient(didStartScreenSharing: true)
+    }
+
+    func onScreenSharingStop() {
+
+    }
+
+    func onScreenSharingFailed() {
+        delegate?.rtcClient(didFailToStartScreenSharing: true)
     }
 }
