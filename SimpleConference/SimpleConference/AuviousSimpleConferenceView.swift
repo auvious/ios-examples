@@ -8,6 +8,40 @@
 import SwiftUI
 import AuviousSDK
 
+// Container view controller that hosts AuviousConferenceVCNew as a child VC.
+// Using addChild() gives the conference view a constraint-free superview,
+// which is required for the SDK's PiP frame manipulation to work correctly.
+class ConferenceContainerViewController: UIViewController {
+    var conferenceVC: AuviousConferenceVCNew?
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard let vc = conferenceVC, vc.parent == nil else { return }
+
+        addChild(vc)
+        let screenBounds = view.bounds
+        vc.view.frame = CGRect(x: 0, y: screenBounds.height, width: screenBounds.width, height: screenBounds.height)
+        view.addSubview(vc.view)
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+            vc.view.frame = screenBounds
+        }, completion: { _ in
+            vc.didMove(toParent: self)
+        })
+    }
+
+    func dismissConferenceVC() {
+        guard let vc = conferenceVC, vc.parent == self else { return }
+        let screenBounds = view.bounds
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseIn], animations: {
+            vc.view.frame.origin.y = screenBounds.height
+        }, completion: { _ in
+            vc.willMove(toParent: nil)
+            vc.view.removeFromSuperview()
+            vc.removeFromParent()
+        })
+    }
+}
+
 struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Environment(\.presentationMode) var presentationMode
     @Binding var ticket: String
@@ -21,18 +55,14 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
     @Binding var screenShareEnabled: Bool
     @Binding var backgroundAudioEnabled: Bool
     @Binding var environment: String
-    
+
     @Binding var error: Error?
-    
-    func makeUIViewController(context: Context) -> AuviousConferenceVCNew {
-        
+
+    func makeUIViewController(context: Context) -> ConferenceContainerViewController {
         let clientId: String = "customer"
         let baseEndpoint: String = "https://"+environment+"/"
         let mqttEndpoint: String = environment
-        /*
-         let params: [String: String] = ["username" : ticket, "password": "something",  "grant_type" : "password"]
-         let vc = AuviousConferenceVCNew(clientId: clientId, params: params, baseEndpoint: baseEndpoint, mqttEndpoint: mqttEndpoint, delegate: context.coordinator, callMode: callMode)
-         */
+
         var conf = AuviousConferenceConfiguration()
         conf.username = ticket
         conf.password = "b"
@@ -49,32 +79,34 @@ struct AuviousSimpleConferenceView: UIViewControllerRepresentable {
         conf.pipAvailable = pipEnabled
         conf.screenSharingAvailable = screenShareEnabled
         conf.backgroundAudioEnabled = backgroundAudioEnabled
-        let vc = AuviousConferenceVCNew(configuration: conf, delegate: context.coordinator)
-        return vc
+
+        let container = ConferenceContainerViewController()
+        container.conferenceVC = AuviousConferenceVCNew(configuration: conf, delegate: context.coordinator)
+        return container
     }
-    
-    func updateUIViewController(_ uiViewController: AuviousConferenceVCNew, context: Context) {
+
+    func updateUIViewController(_ uiViewController: ConferenceContainerViewController, context: Context) {
         // nothing to do here
     }
-    
+
     class Coordinator: NSObject, AuviousSimpleConferenceDelegate, UINavigationControllerDelegate {
         var parent: AuviousSimpleConferenceView;
-        
+
         init(_ parent: AuviousSimpleConferenceView) {
             self.parent = parent
         }
-        
+
         func onConferenceError(_ error: AuviousSDKGenericError) {
             parent.error = error
             parent.presentationMode.wrappedValue.dismiss()
         }
-        
+
         func onConferenceSuccess() {
             parent.error = nil
             parent.presentationMode.wrappedValue.dismiss()
         }
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
