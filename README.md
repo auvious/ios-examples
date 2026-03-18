@@ -102,9 +102,6 @@ class ViewController: UIViewController {
         // 1. Build the configuration
         let config = AuviousConferenceConfiguration()
         config.username = "<ticket>" // set the auvious ticket 
-        config.password = "<password>" // set it to 'b'
-        config.clientId = "<client-id>" // set it to 'customer'
-        config.conference = "<conference-name>"
         config.baseEndpoint = "https://auvious.video/"
         config.mqttEndpoint = "auvious.video"
 
@@ -265,7 +262,7 @@ Used when presenting `AuviousConferenceVCNew` for the built-in conference UI.
 | `username` | `String` | Username (or ticket) used to authenticate with the Auvious platform. |
 | `password` | `String` | Password used to authenticate. |
 | `grantType` | `String` | OAuth grant type. Default: `"password"`. |
-| `clientId` | `String` | Client identifier registered on the Auvious platform. |
+| `clientId` | `String` | Client identifier registered on the Auvious platform. Default: `"customer"`  |
 | `conference` | `String` | Name of the conference room to join or create. |
 | `baseEndpoint` | `String` | Base URL of the Auvious API (e.g. `"https://auvious.video/"`). |
 | `mqttEndpoint` | `String` | Hostname of the MQTT WebSocket broker (e.g. `"auvious.video"`). |
