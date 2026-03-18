@@ -1,6 +1,6 @@
 PODS:
   - AuviousGoogleWebRTC (84.4147.4)
-  - AuviousSDK (1.4.0-rc.2):
+  - AuviousSDK (1.4.0-rc.3):
     - AuviousGoogleWebRTC (~> 84.4147.4)
     - CocoaMQTTWebsocket_IOS13
     - MqttCocoaAsyncSocket_IOS13 (~> 14.0.0)
@@ -20,7 +20,7 @@ PODS:
   - SwiftyJSON (5.0.2)
 
 DEPENDENCIES:
-  - AuviousSDK (= 1.4.0-rc.2)
+  - AuviousSDK (= 1.4.0-rc.3)
   - RxCocoa (= 6.1.0)
   - RxSwift (= 6.1.0)
 
@@ -39,7 +39,7 @@ SPEC REPOS:
 
 SPEC CHECKSUMS:
   AuviousGoogleWebRTC: 146e1bcb5423fbef3796d1e2cd28c7c592ae575a
-  AuviousSDK: 0c07c75039d4e1fb6f603e39fe01d1e1e56951fb
+  AuviousSDK: a45dc32edf2b8087326238ce57fcd8f397a4c854
   CocoaMQTTWebsocket_IOS13: 7f2f31fe4600b2fc0e22c394b56d49da8c32bdef
   MqttCocoaAsyncSocket_IOS13: 31443ca4459930895238e95aecbd0f2fbe0464f6
   RxCocoa: 5c51f02d562cbd94629f6c26cf0c80fe4ab8d343
@@ -48,6 +48,6 @@ SPEC CHECKSUMS:
   Starscream_IOS13: f25f0b90f90e8d4ea4e21b6a8268264745e75000
   SwiftyJSON: f5b1bf1cd8dd53cd25887ac0eabcfd92301c6a5a
 
-PODFILE CHECKSUM: 2a0b88892238a9817b5435ef7b5406f0853e5e61
+PODFILE CHECKSUM: 075a412beb32f58e694db32d556c90dce50be3ae
 
 COCOAPODS: 1.16.2
