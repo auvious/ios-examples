@@ -9,6 +9,7 @@
 import Foundation
 import AVFoundation
 import os
+import Sentry
 
 //Return type for camera commands such as FlashOn, FlashOff, CameraSwitch etc.
 internal typealias CameraResponse = (Bool, String)
@@ -26,6 +27,7 @@ internal protocol RTCDelegate {
     func rtcClient(didStopScreenSharing: Bool)
     func rtcClient(didStartScreenSharing: Bool)
     func rtcClient(didFailToStartScreenSharing: Bool)
+    func rtcClient(screenShareICEConnectionFailed streamId: String)
     
     //rest call
     func rtcClient(call streamId: String, sdpOffer: String, target: String)
@@ -91,6 +93,7 @@ internal extension RTCDelegate {
     func rtcClient(addRemoteStreamIceCandidates candidates: [RTCIceCandidate], userId: String, endpointId: String, streamId: String, streamType: StreamType) {}
     func rtcClient(recorderStateChanged toActive: Bool){}
     func rtcClient(didFailToStartScreenSharing: Bool){}
+    func rtcClient(screenShareICEConnectionFailed streamId: String) {}
 }
 
 internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCapturerDelegate {
@@ -301,10 +304,23 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
         }
     }
     
+    /// Returns the device's native screen pixel dimensions (always portrait-ordered).
+    /// Used to size the screen-share output to match the actual screen aspect ratio.
+    private func nativeScreenSize() -> (width: Int32, height: Int32) {
+        let bounds = UIScreen.main.nativeBounds
+        return (Int32(bounds.width), Int32(bounds.height))
+    }
+
     /// Starts ReplayKit capture to trigger the permission dialog.
     /// The capturer is stored as pending and reused in createScreenSharingStream.
     internal func startScreenCapture(completion: @escaping (Bool) -> Void) {
+        let crumb = Breadcrumb(level: .info, category: "screen_share")
+        crumb.message = "startScreenCapture called"
+        SentrySDK.addBreadcrumb(crumb)
+
         pendingScreenVideoSource = factory.videoSource()
+        let pendingDims = nativeScreenSize()
+        pendingScreenVideoSource?.adaptOutputFormat(toWidth: pendingDims.width, height: pendingDims.height, fps: 15)
         let capturer = ScreenCapturer(videoSource: pendingScreenVideoSource!)
         capturer.delegate = self
         pendingScreenCapturer = capturer
@@ -329,12 +345,26 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
             localScreenVideoSource = pendingSource
             pendingScreenCapturer = nil
             pendingScreenVideoSource = nil
+
+            let crumb = Breadcrumb(level: .info, category: "screen_share")
+            crumb.message = "Screen stream created (reusing pending capturer)"
+            crumb.data = ["streamId": streamId]
+            SentrySDK.addBreadcrumb(crumb)
+
             // Capture is already running; notify delegate directly
             delegate?.rtcClient(didStartScreenSharing: true)
         } else {
             localScreenVideoSource = factory.videoSource()
+            let freshDims = nativeScreenSize()
+            localScreenVideoSource?.adaptOutputFormat(toWidth: freshDims.width, height: freshDims.height, fps: 15)
             screenCapturer = ScreenCapturer(videoSource: localScreenVideoSource!)
             screenCapturer.delegate = self
+
+            let crumb = Breadcrumb(level: .warning, category: "screen_share")
+            crumb.message = "Screen stream created (no pending capturer — starting fresh)"
+            crumb.data = ["streamId": streamId]
+            SentrySDK.addBreadcrumb(crumb)
+
             screenCapturer.start()
         }
 
@@ -347,6 +377,10 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     
     internal func stopScreenSharing() {
         os_log("stopScreenSharing() for type screen and stream %@", log: Log.rtc, type: .debug, localScreenStream ?? "nil")
+        let crumb = Breadcrumb(level: .info, category: "screen_share")
+        crumb.message = "stopScreenSharing called"
+        crumb.data = ["streamId": localScreenStream?.streamId ?? "nil"]
+        SentrySDK.addBreadcrumb(crumb)
         delegate?.rtcClient(didStopScreenSharing: true)
         screenCapturer?.stop()
     }
@@ -722,38 +756,24 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     
     //------------------------------------------
     internal func removePublishStreams(streamId: String) -> Bool{
-        
-        var objects = peerConnections.filter {$0.streamId == streamId}
-        for (index, obj) in objects.enumerated() {
-            if(obj.streamId == streamId){
-                let peerConnection = obj.connection
-                
-                if(obj.streamType == .cam || obj.streamType == .micAndCam){
-                    stopCapture(type: obj.streamType, streamId: obj.streamId)
-                }
-                
-                peerConnection?.close()
-                objects.remove(at: index)
-                
-                return true
-            }
+        guard let obj = peerConnections.first(where: { $0.streamId == streamId }) else {
+            return false
         }
-        return false
+        if obj.streamType == .cam || obj.streamType == .micAndCam {
+            stopCapture(type: obj.streamType, streamId: obj.streamId)
+        }
+        obj.connection?.close()
+        peerConnections.removeAll { $0.streamId == streamId }
+        return true
     }
-    
+
     internal func removeRemoteStreams(streamId: String) -> Bool{
-        
-        var objects = peerConnections.filter {$0.streamId == streamId}
-        for (index, obj) in objects.enumerated() {
-            if(obj.streamId == streamId){
-                let peerConnection = obj.connection
-                peerConnection?.close()
-                objects.remove(at: index)
-                
-                return true
-            }
+        guard let obj = peerConnections.first(where: { $0.streamId == streamId }) else {
+            return false
         }
-        return false
+        obj.connection?.close()
+        peerConnections.removeAll { $0.streamId == streamId }
+        return true
     }
     
     internal func removeAllStreams() {
@@ -910,7 +930,34 @@ internal final class RTCModule: NSObject, RTCPeerConnectionDelegate, RTCVideoCap
     }
     
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
-        //os_log("RTCPeerConnectionDelegate - ARTCClient - Connection state changed: %@", log: Log.rtc, type: .debug, newState.rawValue)
+        guard let container = peerConnections.first(where: { $0.connection == peerConnection }),
+              container.streamType == .screen else { return }
+        let stateName: String
+        switch newState {
+        case .new:          stateName = "new"
+        case .checking:     stateName = "checking"
+        case .connected:    stateName = "connected"
+        case .completed:    stateName = "completed"
+        case .failed:       stateName = "failed"
+        case .disconnected: stateName = "disconnected"
+        case .closed:       stateName = "closed"
+        default:            stateName = "unknown(\(newState.rawValue))"
+        }
+        let crumb = Breadcrumb(level: newState == .failed ? .error : .info, category: "screen_share")
+        crumb.message = "ICE connection state changed"
+        crumb.data = ["state": stateName, "streamId": container.streamId ?? "unknown", "isLocal": container.isLocal]
+        SentrySDK.addBreadcrumb(crumb)
+
+        if newState == .failed {
+            let event = Event(level: .error)
+            event.message = SentryMessage(formatted: "Screen share ICE connection failed")
+            event.extra = ["streamId": container.streamId ?? "unknown", "isLocal": container.isLocal]
+            SentrySDK.capture(event: event)
+
+            if container.isLocal, let streamId = container.streamId {
+                delegate?.rtcClient(screenShareICEConnectionFailed: streamId)
+            }
+        }
     }
     
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {

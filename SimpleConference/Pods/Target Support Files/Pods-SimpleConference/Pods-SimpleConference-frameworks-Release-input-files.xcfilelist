@@ -6,5 +6,6 @@ ${BUILT_PRODUCTS_DIR}/MqttCocoaAsyncSocket_IOS13/MqttCocoaAsyncSocket_IOS13.fram
 ${BUILT_PRODUCTS_DIR}/RxCocoa/RxCocoa.framework
 ${BUILT_PRODUCTS_DIR}/RxRelay/RxRelay.framework
 ${BUILT_PRODUCTS_DIR}/RxSwift/RxSwift.framework
+${BUILT_PRODUCTS_DIR}/Sentry/Sentry.framework
 ${BUILT_PRODUCTS_DIR}/Starscream_IOS13/Starscream_IOS13.framework
 ${BUILT_PRODUCTS_DIR}/SwiftyJSON/SwiftyJSON.framework

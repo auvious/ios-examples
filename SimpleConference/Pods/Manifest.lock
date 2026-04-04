@@ -1,9 +1,10 @@
 PODS:
   - AuviousGoogleWebRTC (84.4147.4)
-  - AuviousSDK (1.4.0-rc.3):
+  - AuviousSDK (1.4.0-rc.5):
     - AuviousGoogleWebRTC (~> 84.4147.4)
     - CocoaMQTTWebsocket_IOS13
     - MqttCocoaAsyncSocket_IOS13 (~> 14.0.0)
+    - Sentry (~> 8.0)
     - Starscream_IOS13 (~> 4.0.4)
     - SwiftyJSON (~> 5.0)
   - CocoaMQTTWebsocket_IOS13 (14.0.0):
@@ -16,13 +17,17 @@ PODS:
   - RxRelay (6.1.0):
     - RxSwift (= 6.1.0)
   - RxSwift (6.1.0)
+  - Sentry (8.58.0):
+    - Sentry/Core (= 8.58.0)
+  - Sentry/Core (8.58.0)
   - Starscream_IOS13 (4.0.4)
   - SwiftyJSON (5.0.2)
 
 DEPENDENCIES:
-  - AuviousSDK (= 1.4.0-rc.3)
+  - AuviousSDK (= 1.4.0-rc.5)
   - RxCocoa (= 6.1.0)
   - RxSwift (= 6.1.0)
+  - Sentry (~> 8.0)
 
 SPEC REPOS:
   https://github.com/auvious/CocoaPodSpecs.git:
@@ -35,19 +40,21 @@ SPEC REPOS:
     - RxCocoa
     - RxRelay
     - RxSwift
+    - Sentry
     - SwiftyJSON
 
 SPEC CHECKSUMS:
   AuviousGoogleWebRTC: 146e1bcb5423fbef3796d1e2cd28c7c592ae575a
-  AuviousSDK: a45dc32edf2b8087326238ce57fcd8f397a4c854
+  AuviousSDK: 08384c197cf9df06bf639b2fceca255532cb4f6f
   CocoaMQTTWebsocket_IOS13: 7f2f31fe4600b2fc0e22c394b56d49da8c32bdef
   MqttCocoaAsyncSocket_IOS13: 31443ca4459930895238e95aecbd0f2fbe0464f6
   RxCocoa: 5c51f02d562cbd94629f6c26cf0c80fe4ab8d343
   RxRelay: 483e1a19fad961b41f0b0c0bee506f46c1ae14fe
   RxSwift: a834e5c538e89eca0cae86f403f4fbf0336786ce
+  Sentry: d587a8fe91ca13503ecd69a1905f3e8a0fcf61be
   Starscream_IOS13: f25f0b90f90e8d4ea4e21b6a8268264745e75000
   SwiftyJSON: f5b1bf1cd8dd53cd25887ac0eabcfd92301c6a5a
 
-PODFILE CHECKSUM: 075a412beb32f58e694db32d556c90dce50be3ae
+PODFILE CHECKSUM: 73779f7023df6b7f75fae6f42e28e2b3b7c9fd4a
 
 COCOAPODS: 1.16.2
