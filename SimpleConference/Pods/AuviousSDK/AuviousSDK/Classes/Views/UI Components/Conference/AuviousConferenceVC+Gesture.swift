@@ -42,14 +42,20 @@ extension AuviousConferenceVCNew {
         guard let pipView = gesture.view else { return }
         guard let container = pipView.superview else { return }
 
-        screenMode = .fullScreen
-        
         //Remove sharing border
         view.layer.borderWidth = 0
 
+        //Set mode and apply fullScreen constraints immediately (no animation)
+        //so they animate together with the frame expansion in a single pass
+        _screenMode = .fullScreen
+        updateGestureState(for: .fullScreen)
+        createConstraints(animated: false)
+
+        //Animate frame expansion and constraint layout together
         UIView.animate(withDuration: 0.3) {
             pipView.frame = container.bounds
             pipView.layer.cornerRadius = 0
+            pipView.layoutIfNeeded()
         }
     }
     

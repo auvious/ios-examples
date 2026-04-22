@@ -48,10 +48,14 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     internal var pipMaximiseButton: UIButton = UIButton(frame: .zero)
     internal var pipStopShareButton: UIButton = UIButton(frame: .zero)
     
-    //The current state of our UI
-    internal var screenMode: ScreenMode = .fullScreen {
-        didSet {
-            updateGestureState(for: screenMode)
+    //The current state of our UI (backing store accessible from extensions)
+    internal var _screenMode: ScreenMode = .fullScreen
+
+    internal var screenMode: ScreenMode {
+        get { _screenMode }
+        set {
+            _screenMode = newValue
+            updateGestureState(for: newValue)
             createConstraints()
         }
     }
@@ -309,8 +313,8 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         //Network indicator
         view.addSubview(networkIndicator)
         networkIndicator.alpha = 0.7
-        networkIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: 6).isActive = true
-        networkIndicator.leftAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leftAnchor, constant: 6).isActive = true
+        networkIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: 2).isActive = true
+        //Leading constraint managed dynamically in createConstraints()
         networkIndicator.widthAnchor.constraint(equalToConstant: 30).isActive = true
         networkIndicator.heightAnchor.constraint(equalToConstant: 30).isActive = true
         let tapRecogniser = UITapGestureRecognizer(target: self, action: #selector(self.networkIndicatorPressed))
@@ -342,8 +346,8 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         recorderIndicator.widthAnchor.constraint(equalToConstant: 50).isActive = true
         recorderIndicator.heightAnchor.constraint(equalToConstant: 30).isActive = true
         
-        recorderIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: 5).isActive = true
-        recorderIndicator.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor, constant: 45).isActive = true
+        recorderIndicator.topAnchor.constraint(equalTo: view.saferAreaLayoutGuide.topAnchor, constant: 2).isActive = true
+        //Leading constraint managed dynamically in createConstraints() — positioned after networkIndicator
        
         let recTapRecogniser = UITapGestureRecognizer(target: self, action: #selector(self.recorderIndicatorPressed))
         recorderIndicator.addGestureRecognizer(recTapRecogniser)
@@ -449,9 +453,11 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         pipMuteButton.addTarget(self, action: #selector(self.pipMicButtonPressed(_:)), for: .touchUpInside)
         pipMuteButton.translatesAutoresizingMaskIntoConstraints = false
         pipMuteButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
-        pipBottomBar.addArrangedSubview(pipMuteButton)
+        if clientConfiguration.microphoneAvailable {
+            pipBottomBar.addArrangedSubview(pipMuteButton)
+        }
     }
-    
+
     @objc private func userDidTakeScreenshot() {
         AuviousConferenceSDK.sharedInstance.wasBackgroundedDueToScreenshot = true
     }
@@ -881,13 +887,22 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
                 
                 blurredOverlayView = ConferenceHoldView(frame: .zero)
                 blurredOverlayView!.image = screenshot
-                view.addSubview(blurredOverlayView!)
-                
+                blurredOverlayView?.configurePiP(screenMode != .fullScreen)
+                view.insertSubview(blurredOverlayView!, belowSubview: pipMaximiseButton)
+
                 blurredOverlayView?.topAnchor.constraint(equalTo: view.topAnchor, constant: 0).isActive = true
                 blurredOverlayView?.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 0).isActive = true
                 blurredOverlayView?.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0).isActive = true
                 blurredOverlayView?.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0).isActive = true
-                
+
+                pipMuteButton.isUserInteractionEnabled = false
+                pipMuteButton.alpha = 0.5
+                if AuviousConferenceSDK.sharedInstance.sharingMyScreen {
+                    pipStopShareButton.isUserInteractionEnabled = false
+                    pipStopShareButton.alpha = 0.5
+                }
+                popoverVC.setOnHold(true)
+
                 UIView.animate(withDuration: effectDuration, animations: {
                     self.blurredOverlayView?.blurView.alpha = 0.9
                 }, completion: { _ in
@@ -902,10 +917,15 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
                     blurredOverlayView.alpha = 0
                 }, completion: { _ in
                     self.buttonContainerView.conferenceOnHold(false)
-                    
+                    self.pipMuteButton.isUserInteractionEnabled = true
+                    self.pipMuteButton.alpha = 1
+                    self.pipStopShareButton.isUserInteractionEnabled = true
+                    self.pipStopShareButton.alpha = 1
+                    self.popoverVC.setOnHold(false)
+
                     AuviousConferenceSDK.sharedInstance.addLocalAudioStream()
                     AuviousConferenceSDK.sharedInstance.addLocalVideoStream()
-                    
+
                     blurredOverlayView.removeFromSuperview()
                     self.blurredOverlayView = nil
                 })
@@ -1058,6 +1078,11 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         _ = remoteViews.map{ $0.removeFromSuperview() }
         remoteViews.removeAll()
 
+        // Reset local view so the stale video track is detached from the renderer
+        // before the republished stream arrives. Without this, the old frozen frame
+        // can linger even after the new video track is attached.
+        localView.resetStreamView()
+
         currentConference = conference
         conferenceParticipants = currentConference.participants.count
 
@@ -1156,6 +1181,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
             
         )
         recorderIndicator.alpha = toActive ? 1 : 0
+        createConstraints()
     }
     
     public func auviousSDK(trackMuted type: StreamType, endpointId: String) {
@@ -1219,6 +1245,12 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
     
     public func auviousSDK(screenSharingStopped: Bool) {
         localScreenShareStreamId = nil
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.stopScreenSharingButton.alpha = 0
+            self.toggleSharingBorder(mode: false)
+        }
     }
     
     // MARK: -
@@ -1256,14 +1288,14 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         createConstraints()
     }
     
-    private func createConstraints() {
+    internal func createConstraints(animated: Bool = true) {
         var constraints: [NSLayoutConstraint] = []
         let safeArea = streamContainerView.saferAreaLayoutGuide
         let isLandscape = UIApplication.shared.statusBarOrientation.isLandscape
         var safeLeadingConstraint = view.leadingAnchor
         
         //Network indicator placement
-        var networkIndicatorLeadingConstant: CGFloat = 0
+        var networkIndicatorLeadingConstant: CGFloat = 6
         
         //For landscape left we use the safe area leading constraint - otherwise superview
         if UIDevice.current.orientation == UIDeviceOrientation.landscapeLeft {
@@ -1275,13 +1307,12 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         //PIP mode
         if screenMode == .pip {
             os_log("PIP screen share mode entered", log: Log.conferenceUI, type: .info)
+            blurredOverlayView?.configurePiP(true)
             networkIndicator.alpha = 0
             pipMaximiseButton.alpha = 0
             pipBottomBar.alpha = 0
             
-            if AuviousConferenceSDK.sharedInstance.sharingMyScreen {
-                stopScreenSharingButton.alpha = 0
-            }
+            stopScreenSharingButton.alpha = 0
             buttonContainerView.alpha = 0
             
             if !remoteViews.isEmpty {
@@ -1295,6 +1326,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
             }
         } else if screenMode == .expandedPip {
             os_log("Expanded PIP screen share mode entered", log: Log.conferenceUI, type: .info)
+            blurredOverlayView?.configurePiP(true)
             networkIndicator.alpha = 0
             stopScreenSharingButton.alpha = 0
             buttonContainerView.alpha = 0
@@ -1306,10 +1338,14 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
                 p.removeFromSuperview()
             }
             if !AuviousConferenceSDK.sharedInstance.sharingMyScreen {
-                pipBottomBar.addArrangedSubview(pipMuteButton)
+                if clientConfiguration.microphoneAvailable {
+                    pipBottomBar.addArrangedSubview(pipMuteButton)
+                }
             } else {
                 pipBottomBar.addArrangedSubview(pipStopShareButton)
-                pipBottomBar.addArrangedSubview(pipMuteButton)
+                if clientConfiguration.microphoneAvailable {
+                    pipBottomBar.addArrangedSubview(pipMuteButton)
+                }
             }
             
             pipBottomBar.alpha = 1
@@ -1324,6 +1360,7 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
             constraints.append(agentView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0))
         } else {
             os_log("PIP screen share mode exited", log: Log.conferenceUI, type: .info)
+            blurredOverlayView?.configurePiP(false)
             networkIndicator.alpha = 1
             pipMaximiseButton.alpha = 0
             pipBottomBar.alpha = 0
@@ -1758,18 +1795,25 @@ public class AuviousConferenceVCNew: UIViewController, AuviousSDKConferenceDeleg
         }
         
         constraints.append(networkIndicator.leadingAnchor.constraint(equalTo: view.saferAreaLayoutGuide.leadingAnchor, constant: networkIndicatorLeadingConstant))
-        
-        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.9, initialSpringVelocity: 2, options: .curveEaseInOut, animations: {
+        constraints.append(recorderIndicator.leadingAnchor.constraint(equalTo: networkIndicator.trailingAnchor, constant: 5))
+
+        let applyConstraints = {
             //Clear existing constraints
             if !self.existingConstraints.isEmpty {
                 NSLayoutConstraint.deactivate(self.existingConstraints)
             }
-            
+
             NSLayoutConstraint.activate(constraints)
             self.existingConstraints = constraints
-            
+
             self.view.layoutIfNeeded()
-        })
+        }
+
+        if animated {
+            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.9, initialSpringVelocity: 2, options: .curveEaseInOut, animations: applyConstraints)
+        } else {
+            applyConstraints()
+        }
     }
 }
 

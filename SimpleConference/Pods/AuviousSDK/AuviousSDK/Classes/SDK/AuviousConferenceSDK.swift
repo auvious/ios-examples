@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 import os
 
 public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, UserEndpointDelegate {
@@ -100,11 +101,17 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     /// Internal flag for handling the iOS Screenshot dialog app resume
     internal var wasBackgroundedDueToScreenshot: Bool = false
 
+    /// Cancels the screenshot reset timer if the app actually backgrounds before it fires
+    private var screenshotResetWorkItem: DispatchWorkItem?
+
     /// True when peer connections are kept alive in background with audio still running
     internal var isBackgroundAudioActive: Bool = false
 
     /// True when onApplicationPause() was called, so onApplicationResume() only runs after a real background transition
     private var didPauseForBackground: Bool = false
+
+    /// True if the camera was active when the app went to background (background audio path only)
+    private var cameraWasEnabledBeforeBackground: Bool = false
 
     /// GCD timer used for keep-alive while in background (RunLoop timers don't fire in background)
     private var backgroundKeepAliveTimer: DispatchSourceTimer?
@@ -113,6 +120,31 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     private var hostAppSupportsBackgroundAudio: Bool {
         guard let modes = Bundle.main.infoDictionary?["UIBackgroundModes"] as? [String] else { return false }
         return modes.contains("audio")
+    }
+
+    private init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenshotTaken),
+            name: UIApplication.userDidTakeScreenshotNotification,
+            object: nil
+        )
+    }
+
+    /// Called when the user takes a screenshot. Sets the flag so that if the user taps
+    /// the thumbnail and the app briefly backgrounds, we skip the conference rejoin.
+    /// A fallback timer resets the flag after 15 seconds if the app never backgrounds.
+    @objc private func handleScreenshotTaken() {
+        wasBackgroundedDueToScreenshot = true
+        os_log("Screenshot detected — suppressing next app resume rejoin", log: Log.conferenceSDK, type: .debug)
+
+        screenshotResetWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.wasBackgroundedDueToScreenshot = false
+            self?.screenshotResetWorkItem = nil
+        }
+        screenshotResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7, execute: workItem)
     }
 
     //MARK: -
@@ -151,10 +183,51 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     public func onApplicationPause(){
         didPauseForBackground = true
 
+        // App is entering real background — cancel the screenshot fallback timer so it doesn't
+        // reset wasBackgroundedDueToScreenshot while we are backgrounded. onApplicationResume()
+        // will clear the flag once the user returns.
+        screenshotResetWorkItem?.cancel()
+        screenshotResetWorkItem = nil
+
         // Background audio path: keep peer connections alive, pause only video
-        if uiConfiguration.backgroundAudioEnabled && hostAppSupportsBackgroundAudio && currentConference != nil && !sharingMyScreen {
+        if uiConfiguration.backgroundAudioEnabled && hostAppSupportsBackgroundAudio && currentConference != nil {
             isBackgroundAudioActive = true
+            cameraWasEnabledBeforeBackground = rtcClient?.localVideoTrack?.isEnabled == true
             rtcClient?.pauseVideoForBackground()
+
+            if cameraWasEnabledBeforeBackground,
+               let conference = currentConference,
+               let endpointId = UserEndpointModule.sharedInstance.userEndpointId,
+               let videoStreamId = rtcClient.peerConnections.first(where: { ($0.streamType == .cam || $0.streamType == .micAndCam) && $0.isLocal })?.streamId {
+                let request = UpdateMetadataRequest(conferenceId: conference.id, streamId: videoStreamId, userEndpointId: endpointId, operation: .set, type: .video, value: "true")
+                API2.sharedInstance.updateConferenceMetadata(request, onSuccess: { _ in }, onFailure: { _ in })
+            }
+
+            // Stop screen sharing if active — ReplayKit capture cannot continue in background
+            if sharingMyScreen, let conference = currentConference,
+               let loginResponse = AuthenticationModule.sharedInstance.loginResponse,
+               let userId = loginResponse.userId,
+               let endpointId = UserEndpointModule.sharedInstance.userEndpointId {
+
+                // Find the screen share stream before tearing it down
+                let screenStreamId = rtcClient.peerConnections.first(where: { $0.streamType == .screen && $0.isLocal })?.streamId
+
+                rtcClient.stopScreenSharing()
+                sharingMyScreen = false
+
+                if let streamId = screenStreamId {
+                    _ = rtcClient.removePublishStreams(streamId: streamId)
+                    let usRequest = UnpublishStreamRequest(
+                        conferenceId: conference.id,
+                        streamId: streamId,
+                        userEndpointId: endpointId,
+                        userId: userId
+                    )
+                    API2.sharedInstance.unpublishStream(usRequest, onSuccess: { _ in }, onFailure: { _ in })
+                }
+
+                delegate?.auviousSDK(screenSharingStopped: true)
+            }
 
             // Switch from RunLoop timer (won't fire in background) to GCD timer
             UserEndpointModule.sharedInstance.keepAliveTimer?.invalidate()
@@ -217,6 +290,16 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
             stopBackgroundKeepAliveTimer()
             UserEndpointModule.sharedInstance.startKeepAliveTimer()
             rtcClient?.resumeVideoForForeground()
+
+            if cameraWasEnabledBeforeBackground,
+               let conference = currentConference,
+               let endpointId = UserEndpointModule.sharedInstance.userEndpointId,
+               let videoStreamId = rtcClient.peerConnections.first(where: { ($0.streamType == .cam || $0.streamType == .micAndCam) && $0.isLocal })?.streamId {
+                let request = UpdateMetadataRequest(conferenceId: conference.id, streamId: videoStreamId, userEndpointId: endpointId, operation: .remove, type: .video, value: "false")
+                API2.sharedInstance.updateConferenceMetadata(request, onSuccess: { _ in }, onFailure: { _ in })
+            }
+            cameraWasEnabledBeforeBackground = false
+
             endBackgroundTask()
             delegate?.auviousSDK(didResumeFromBackground: true)
             return
@@ -225,7 +308,21 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         // Only rejoin if onApplicationPause() was actually called (real background transition).
         // Notification center / widgets center only trigger willResignActive → didBecomeActive,
         // which would otherwise cause a spurious rejoin and duplicate stream publishing.
-        guard didPauseForBackground else { return }
+        guard didPauseForBackground else {
+            if isPendingScreenSharePermission {
+                isPendingScreenSharePermission = false
+            }
+            // App became active without a real background transition (e.g. screenshot thumbnail
+            // auto-dismissed, notification centre briefly shown). Clear the screenshot flag now
+            // so it doesn't suppress a future real-background rejoin.
+            if wasBackgroundedDueToScreenshot {
+                wasBackgroundedDueToScreenshot = false
+                screenshotResetWorkItem?.cancel()
+                screenshotResetWorkItem = nil
+            }
+            return
+            
+        }
         didPauseForBackground = false
 
         //Ensure we have logged in, and have created an endpoint
@@ -241,6 +338,8 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         guard !sharingMyScreen && !wasBackgroundedDueToScreenshot && !isPendingScreenSharePermission else {
             print("onApplicationResume() called but we are sharing our screen / resuming from screenshot / pending screen share permission so no rejoin")
             wasBackgroundedDueToScreenshot = false
+            screenshotResetWorkItem?.cancel()
+            screenshotResetWorkItem = nil
             isPendingScreenSharePermission = false
             return
         }
@@ -322,14 +421,17 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      */
     private func rejoinConference(conferenceId: String) {
         joinConference(conferenceId: conferenceId, onSuccess: {conference in
-            
+
             if let conf = conference {
                 self.delegate?.auviousSDK(didRejoinConference: conf)
             }
         }, onFailure: {(error) in
             os_log("Unable to rejoin conference %@ - error %@", log: Log.conferenceSDK, type: .error, conferenceId, error.localizedDescription)
+            // Notify the delegate so the UI can surface the error rather than leaving
+            // the user with a frozen stream and no feedback.
+            self.delegate?.auviousSDK(onError: AuviousSDKError.connectionError)
         })
-        
+
         lastConferenceJoined = nil
     }
     
@@ -389,9 +491,13 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
         }
         
         if type == .screen {
+            guard currentConference != nil else {
+                throw AuviousSDKError.notInConference
+            }
+            isPendingScreenSharePermission = false
             sharingMyScreen = true
         }
-        
+
         let streamId = UUID().uuidString
         delegate?.auviousSDK(didChangeState: .localStreamIsConnecting, streamId: streamId, streamType: type, endpointId:endpointId)
         rtcClient.configurePublishStream(type: type, streamId: streamId, endpointId: endpointId, userId: userId)
@@ -702,6 +808,21 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
      - Parameter onFailure: Called in case of failure with the designated Error
      */
     public func leaveConference(conferenceId: String, onSuccess: @escaping ()->(), onFailure: @escaping (Error)->()) {
+        guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse, let userId = loginResponse.userId else {
+            onFailure(AuviousSDKError.notLoggedIn)
+            return
+        }
+
+        guard let endpointId = UserEndpointModule.sharedInstance.userEndpointId else {
+            onFailure(AuviousSDKError.endpointNotCreated)
+            return
+        }
+
+        guard self.currentConference != nil else {
+            onFailure(AuviousSDKError.notInConference)
+            return
+        }
+
         // Clean up background audio state if active
         isBackgroundAudioActive = false
         if sharingMyScreen {
@@ -712,42 +833,29 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
 
         //Step 1 - Close all streams
         removeAllStreams()
-        
-        //Step 2 - Unpublish all local streams
+
+        //Step 2 - Unpublish all local streams (needs currentConference, must run before nil-ing it)
         unpublishAllLocalStreams()
-        
-        //Step 3 - Stop all remote streams
+
+        //Step 3 - Stop all remote streams (needs currentConference, must run before nil-ing it)
         stopAllRemoteStreams()
-        
+
         //Step 4 - Empty peer connections
         emptyPeerConnections()
-        
+
+        // Nil currentConference synchronously before the HTTP call. The HTTP callback below
+        // must not touch client state — a concurrent rejoin may already have set a new
+        // currentConference for the same conferenceId, and overwriting it would cause the
+        // UI's subsequent leave to fail with notInConference.
+        self.currentConference = nil
+
         //Step 5 - Leave conference
-        guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse, let userId = loginResponse.userId else {
-            onFailure(AuviousSDKError.notLoggedIn)
-            return
-        }
-        
-        guard let endpointId = UserEndpointModule.sharedInstance.userEndpointId else {
-            onFailure(AuviousSDKError.endpointNotCreated)
-            return
-        }
-        
-        guard let _ = self.currentConference else {
-            onFailure(AuviousSDKError.notInConference)
-            return
-        }
-        
         let lcRequest = LeaveConferenceRequest(conferenceId: conferenceId, reason: "", userEndpointId: endpointId, userId: userId)
         API2.sharedInstance.leaveConference(lcRequest, onSuccess: {(json) in
-            
             if let _ = json {
-                self.currentConference = nil
                 onSuccess()
             }
-            
         }, onFailure: {(error) in
-            self.currentConference = nil
             onFailure(error)
         })
     }
@@ -923,6 +1031,7 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
     /// Cleanup state
     private func cleanState(){
         UserEndpointModule.sharedInstance.stopKeepAliveTimer()
+        API2.sharedInstance.stopTokenRefreshTimer()
         MQTTModule2.sharedInstance.disconnect()
         self.currentConference = nil
     }
@@ -1349,6 +1458,49 @@ public final class AuviousConferenceSDK: MQTTConferenceDelegate, RTCDelegate, Us
 
     internal func rtcClient(didFailToStartScreenSharing: Bool) {
         sharingMyScreen = false
+    }
+
+    internal func rtcClient(screenShareICEConnectionNeedsRestart streamId: String) {
+        // Tear down the failed peer connection and unpublish, but keep the
+        // screen capturer running so we can re-publish without asking for
+        // ReplayKit permission again.
+        _ = rtcClient.removePublishStreams(streamId: streamId)
+
+        guard let loginResponse = AuthenticationModule.sharedInstance.loginResponse,
+              let userId = loginResponse.userId,
+              let endpointId = UserEndpointModule.sharedInstance.userEndpointId,
+              let conference = currentConference else {
+            // Cannot retry — fall through to permanent failure.
+            rtcClient.stopScreenSharing()
+            sharingMyScreen = false
+            delegate?.auviousSDK(screenSharingStopped: true)
+            return
+        }
+
+        let usRequest = UnpublishStreamRequest(
+            conferenceId: conference.id,
+            streamId: streamId,
+            userEndpointId: endpointId,
+            userId: userId
+        )
+
+        API2.sharedInstance.unpublishStream(usRequest, onSuccess: { [weak self] _ in
+            self?.retryScreenSharePublish(endpointId: endpointId, userId: userId)
+        }, onFailure: { [weak self] _ in
+            // Unpublish failed, but still attempt the re-publish
+            self?.retryScreenSharePublish(endpointId: endpointId, userId: userId)
+        })
+    }
+
+    /// Re-publishes the screen share stream using the still-running ReplayKit capturer.
+    private func retryScreenSharePublish(endpointId: String, userId: String) {
+        // Move the running capturer to pending state so configurePublishStream reuses it
+        // instead of creating a new one (which would trigger the permission dialog again).
+        rtcClient.prepareScreenCaptureForRetry()
+
+        let newStreamId = UUID().uuidString
+        delegate?.auviousSDK(didChangeState: .localStreamIsConnecting, streamId: newStreamId, streamType: .screen, endpointId: endpointId)
+        rtcClient.configurePublishStream(type: .screen, streamId: newStreamId, endpointId: endpointId, userId: userId)
     }
 
     internal func rtcClient(screenShareICEConnectionFailed streamId: String) {
