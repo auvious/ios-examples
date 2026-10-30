@@ -8,18 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		2A41E4322D086207003E84D8 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A41E4312D086207003E84D8 /* AppDelegate.swift */; };
+		3B2275E8FBDF899E2DC3C7EE /* CobrowseSwiftUIDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B933F49F6715ABDAEDA46F9 /* CobrowseSwiftUIDemo.swift */; };
+		67750C92608C2C2DA991CF78 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE8FA6B05E1CFCEDA4AE81E /* Extensions.swift */; };
 		68411FCD25C1ACC200A9BCF9 /* SimpleConferenceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411FCC25C1ACC200A9BCF9 /* SimpleConferenceApp.swift */; };
 		68411FCF25C1ACC200A9BCF9 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411FCE25C1ACC200A9BCF9 /* MainView.swift */; };
 		68411FD125C1ACC700A9BCF9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68411FD025C1ACC700A9BCF9 /* Assets.xcassets */; };
 		68411FD425C1ACC700A9BCF9 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68411FD325C1ACC700A9BCF9 /* Preview Assets.xcassets */; };
-		68A4C82525C1F07700EF609F /* AuviousSimpleConferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A4C82425C1F07600EF609F /* AuviousSimpleConferenceView.swift */; };
 		68A4C84425C1FD0E00EF609F /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 68A4C84325C1FD0E00EF609F /* Launch Screen.storyboard */; };
-		68D097A525C301D1008A5D5C /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D097A425C301D1008A5D5C /* PermissionsManager.swift */; };
 		798B32F4F48BC1EA5B5A61BD /* Pods_SimpleConference.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AC2DE2995768B5CA6FDE922B /* Pods_SimpleConference.framework */; };
+		D3FACB39EAAA24A41A955E96 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75157C06930D8AE65413EF38 /* ViewController.swift */; };
+		F8F89CC170EED164D90516A2 /* CobrowseDemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE807ADFAA539A41F0C19940 /* CobrowseDemoViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		09AE56A19DFC728AAB9B776C /* Pods-SimpleConference.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SimpleConference.debug.xcconfig"; path = "Target Support Files/Pods-SimpleConference/Pods-SimpleConference.debug.xcconfig"; sourceTree = "<group>"; };
+		1BE8FA6B05E1CFCEDA4AE81E /* Extensions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		2A41E4312D086207003E84D8 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		68411FC925C1ACC200A9BCF9 /* SimpleConference.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleConference.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		68411FCC25C1ACC200A9BCF9 /* SimpleConferenceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleConferenceApp.swift; sourceTree = "<group>"; };
@@ -27,11 +30,12 @@
 		68411FD025C1ACC700A9BCF9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		68411FD325C1ACC700A9BCF9 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		68411FD525C1ACC700A9BCF9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		68A4C82425C1F07600EF609F /* AuviousSimpleConferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuviousSimpleConferenceView.swift; sourceTree = "<group>"; };
 		68A4C84325C1FD0E00EF609F /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
-		68D097A425C301D1008A5D5C /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
+		75157C06930D8AE65413EF38 /* ViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		8B933F49F6715ABDAEDA46F9 /* CobrowseSwiftUIDemo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CobrowseSwiftUIDemo.swift; sourceTree = "<group>"; };
 		AC2DE2995768B5CA6FDE922B /* Pods_SimpleConference.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SimpleConference.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA4877514758C3B96C9A0666 /* Pods-SimpleConference.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SimpleConference.release.xcconfig"; path = "Target Support Files/Pods-SimpleConference/Pods-SimpleConference.release.xcconfig"; sourceTree = "<group>"; };
+		FE807ADFAA539A41F0C19940 /* CobrowseDemoViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CobrowseDemoViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,8 +95,10 @@
 				68A4C84325C1FD0E00EF609F /* Launch Screen.storyboard */,
 				68411FD525C1ACC700A9BCF9 /* Info.plist */,
 				68411FD225C1ACC700A9BCF9 /* Preview Content */,
-				68A4C82425C1F07600EF609F /* AuviousSimpleConferenceView.swift */,
-				68D097A425C301D1008A5D5C /* PermissionsManager.swift */,
+				75157C06930D8AE65413EF38 /* ViewController.swift */,
+				FE807ADFAA539A41F0C19940 /* CobrowseDemoViewController.swift */,
+				8B933F49F6715ABDAEDA46F9 /* CobrowseSwiftUIDemo.swift */,
+				1BE8FA6B05E1CFCEDA4AE81E /* Extensions.swift */,
 			);
 			path = SimpleConference;
 			sourceTree = "<group>";
@@ -220,10 +226,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				68411FCF25C1ACC200A9BCF9 /* MainView.swift in Sources */,
-				68A4C82525C1F07700EF609F /* AuviousSimpleConferenceView.swift in Sources */,
-				68D097A525C301D1008A5D5C /* PermissionsManager.swift in Sources */,
 				2A41E4322D086207003E84D8 /* AppDelegate.swift in Sources */,
 				68411FCD25C1ACC200A9BCF9 /* SimpleConferenceApp.swift in Sources */,
+				D3FACB39EAAA24A41A955E96 /* ViewController.swift in Sources */,
+				F8F89CC170EED164D90516A2 /* CobrowseDemoViewController.swift in Sources */,
+				3B2275E8FBDF899E2DC3C7EE /* CobrowseSwiftUIDemo.swift in Sources */,
+				67750C92608C2C2DA991CF78 /* Extensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,19 +361,19 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"SimpleConference/Preview Content\"";
 				DEVELOPMENT_TEAM = 2WYS7Y8JDD;
 				ENABLE_BITCODE = NO;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SimpleConference/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.auvious.examples.SimpleConference;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -380,18 +388,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SimpleConference/Preview Content\"";
 				DEVELOPMENT_TEAM = 2WYS7Y8JDD;
 				ENABLE_BITCODE = NO;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SimpleConference/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.auvious.examples.SimpleConference;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

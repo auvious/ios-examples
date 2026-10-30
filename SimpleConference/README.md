@@ -1,34 +1,39 @@
-# Simple Conference Example using SwiftUI
+# Simple Conference Example
 
-A SwiftUI example app that demonstrates how to integrate the AuviousSDK to create audio/video conference calls.
+An example app, built from the SDK's `ExampleSimpleConference`, that demonstrates how to integrate the AuviousSDK to create audio/video conference calls.
 
 ## Setup
 
-- Include AuviousSDK CocoaPod from Auvious CocoaPod repo, see `Podfile`
+- Include AuviousSDK CocoaPod from Auvious CocoaPod repo, see `Podfile` (iOS 15+, SDK 1.5.0)
+- Run `pod install` and open `SimpleConference.xcworkspace`
 - Disable bitcode target under **Build Settings**
 - Add `NSMicrophoneUsageDescription` and `NSCameraUsageDescription` texts in `Info.plist`
 
+## Structure
+
+The app entry point is SwiftUI (`SimpleConferenceApp`), which hosts the UIKit demo (`ViewController`) in a navigation controller (`MainView`). The SDK pause/resume calls are made from the scene phase in `SimpleConferenceApp`.
+
 ## Usage
 
-1. Enter a **ticket** (used as the username for authentication).
-2. Enter an **environment** (the Auvious server hostname, defaults to `auvious.video`).
-3. Configure the toggles below to control conference features.
-4. Tap one of the call buttons to start a conference:
-   - **Audio Call** — audio only (`callMode = .audio`)
-   - **Camera Call** — camera only, no microphone (`callMode = .video`)
-   - **Video Call** — audio and video (`callMode = .audioVideo`)
+The screen switches between **Video call** and **Co-browse** at the top.
+
+1. Enter a **ticket** (required) and optionally a **name**; pick the **environment** (PROD, DEV, STG).
+2. **Video call**: optionally enter a **conference** name, pick the call mode (audio, video, audio & video) and set the toggles below, then tap **Call now**.
+3. **Co-browse**: set the masking rules, then tap **Start co-browse** to open a sample "Send money" form.
 
 ## SDK Configuration Flags
 
-These flags are set on `AuviousConferenceConfiguration` before launching the conference view controller.
+These flags are set on `AuviousConferenceConfiguration` before the conference view controller is created.
 
 | Toggle | Config Property | Description |
 |---|---|---|
-| **audio output to speaker** | `enableSpeaker` | Routes audio output to the device speaker instead of the earpiece. |
-| **camera** | `cameraAvailable` | Shows or hides the camera toggle button in the conference UI. When disabled, the user cannot enable their camera during the call. |
-| **microphone** | `microphoneAvailable` | Shows or hides the microphone toggle button in the conference UI. When disabled, the user cannot unmute during the call. |
-| **speaker** | `speakerAvailable` | Shows or hides the speaker toggle button in the conference UI. When disabled, the user cannot switch audio output during the call. |
-| **share screen** | `screenSharingAvailable` | Enables the screen sharing capability. When enabled, a screen share button appears in the conference UI allowing the user to broadcast their screen to other participants. |
-| **Floating window** | `pipAvailable` | Enables Picture-in-Picture (PiP) mode. When enabled, the conference video can be minimized into a floating overlay window that stays visible while using other apps. |
-| **custom background** | `conferenceBackgroundColor` | Sets a custom background color for the conference view. When enabled the background is blue; when disabled it is black. |
-| **background audio** | `backgroundAudioEnabled` | Keeps the audio session active when the app moves to the background. When enabled, conference audio continues playing even if the user switches to another app. |
+| **Audio output to speaker** | `enableSpeaker` | Routes audio output to the device speaker instead of the earpiece. |
+| **Background audio** | `backgroundAudioEnabled` | Keeps the audio session active when the app moves to the background. |
+| **Camera** | `cameraAvailable` | Shows or hides the camera button during the call. |
+| **Microphone** | `microphoneAvailable` | Shows or hides the microphone button during the call. |
+| **Speaker** | `speakerAvailable` | Shows or hides the speaker button during the call. |
+| **Picture in picture** | `pipAvailable` | Lets the call shrink into a floating window. |
+| **Screen sharing** | `screenSharingAvailable` | Shows the screen share button. |
+| **Allow AR pointer** | `arPointerAvailable` | Lets the agent point and draw on the camera or shared screen. |
+| **Allow co-browse in the call** | `cobrowseAvailable` | Lets the agent ask to see the app during the call. |
+| **Masking** | `cobrowseMasking`, `cobrowseShowsMaskHints` | Rules for the views that are blacked out for the agent (`AuviousMaskingRules`). |

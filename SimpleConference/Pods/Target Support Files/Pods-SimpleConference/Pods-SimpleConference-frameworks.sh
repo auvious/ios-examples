@@ -176,28 +176,22 @@ code_sign_if_enabled() {
 }
 
 if [[ "$CONFIGURATION" == "Debug" ]]; then
-  install_framework "${PODS_ROOT}/AuviousGoogleWebRTC/frameworks/WebRTC.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/AuviousSDK/AuviousSDK.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/CocoaMQTTWebsocket_IOS13/CocoaMQTTWebsocket_IOS13.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/MqttCocoaAsyncSocket_IOS13/MqttCocoaAsyncSocket_IOS13.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxCocoa/RxCocoa.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxRelay/RxRelay.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxSwift/RxSwift.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Sentry/Sentry.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Starscream_IOS13/Starscream_IOS13.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/SwiftyJSON/SwiftyJSON.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/AuviousGoogleWebRTC/WebRTC.framework"
 fi
 if [[ "$CONFIGURATION" == "Release" ]]; then
-  install_framework "${PODS_ROOT}/AuviousGoogleWebRTC/frameworks/WebRTC.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/AuviousSDK/AuviousSDK.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/CocoaMQTTWebsocket_IOS13/CocoaMQTTWebsocket_IOS13.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/MqttCocoaAsyncSocket_IOS13/MqttCocoaAsyncSocket_IOS13.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxCocoa/RxCocoa.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxRelay/RxRelay.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/RxSwift/RxSwift.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Sentry/Sentry.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Starscream_IOS13/Starscream_IOS13.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/SwiftyJSON/SwiftyJSON.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/AuviousGoogleWebRTC/WebRTC.framework"
 fi
 if [ "${COCOAPODS_PARALLEL_CODE_SIGN}" == "true" ]; then
   wait

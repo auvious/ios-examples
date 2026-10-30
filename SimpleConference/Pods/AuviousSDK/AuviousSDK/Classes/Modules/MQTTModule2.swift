@@ -15,14 +15,9 @@ internal protocol MQTTConferenceDelegate {
     func conferenceMessageReceived(_ object: ConferenceEvent)
 }
 
-internal protocol MQTTCallDelegate {
-    
-    func callMessageReceived(_ object: CallEvent)
-}
+internal protocol MQTTUserEventDelegate: AnyObject {
 
-internal protocol MQTTSnapshotDelegate {
-    
-    func snapshotMessageReceived(_ object: SnapshotEvent)
+    func userEventReceived(_ type: RtcUserEventType, json: JSON)
 }
 
 internal final class MQTTModule2: CocoaMQTTDelegate {
@@ -36,10 +31,9 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
     private var subscriptionCallback: (()->())?
     
     //Delegates
-    var callDelegate: MQTTCallDelegate?
     var conferenceDelegate: MQTTConferenceDelegate?
-    var snapshotDelegate: MQTTSnapshotDelegate?
-    
+    weak var userEventDelegate: MQTTUserEventDelegate?
+
     func configure(endpointId: String) {
         self.endpointId = endpointId
     }
@@ -78,9 +72,10 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
     /// Disconnect and reconnect with updated credentials (used by token refresh).
     func disconnectAndReconnect() {
         os_log("MQTT2 disconnecting (will reconnect)", log: Log.mqtt, type: .debug)
+        refreshCredentials()
         self.mqtt.disconnect()
     }
-    
+
     func reconnect() {
         os_log("MQTT2 reconnect called", log: Log.mqtt, type: .debug)
         switch mqtt.connState {
@@ -90,8 +85,16 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
             os_log("MQTT2 session status CONNECTING - no need to reconnect", log: Log.mqtt, type: .debug)
         default:
             os_log("MQTT2 reconnecting", log: Log.mqtt, type: .debug)
+            refreshCredentials()
             _ = mqtt.connect()
         }
+    }
+
+    /// The broker password is the access token, so the client must pick up the latest one
+    /// after a token refresh — otherwise reconnects keep sending the expired login token.
+    private func refreshCredentials() {
+        self.mqtt.username = ServerConfiguration.mqttUser
+        self.mqtt.password = ServerConfiguration.mqttPass
     }
     
     private func subscribeForUserEndpoint() {
@@ -126,7 +129,13 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
         if let payload = message.string {
             let jsonObject = JSON(parseJSON: payload)
             os_log("%@", log: Log.mqtt, type: .debug, jsonObject.debugDescription)
-            
+
+            //User events (co-browse, sketch, laser) are not conference versioned, route them directly
+            if let userEventType = RtcUserEventType(rawValue: jsonObject["type"].stringValue) {
+                userEventDelegate?.userEventReceived(userEventType, json: jsonObject)
+                return
+            }
+
             if let eventType = ConferenceEventType(rawValue: jsonObject["type"].stringValue) {
                 
                 var model: ConferenceEvent!
@@ -153,46 +162,6 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
                 }
                 
                 conferenceDelegate?.conferenceMessageReceived(model)
-                
-            } else if let eventType = CallEventType(rawValue: jsonObject["type"].stringValue) {
-                var model: CallEvent!
-                
-                switch eventType {
-                case .callAnswered:
-                    model = CallAnsweredEvent(fromJson: jsonObject)
-                case .callEnded:
-                    model = CallEndedEvent(fromJson: jsonObject)
-                case .callCreated:
-                    model = CallCreatedEvent(fromJson: jsonObject)
-                case .callRinging:
-                    model = CallRingingEvent(fromJson: jsonObject)
-                case .callRejected:
-                    model = CallRejectedEvent(fromJson: jsonObject)
-                case .callCancelled:
-                    model = CallCancelledEvent(fromJson: jsonObject)
-                case .callIceCandidatesFound:
-                    model = IceCandidatesFoundEvent(fromJson: jsonObject)
-                }
-                
-                callDelegate?.callMessageReceived(model)
-                
-            } else if let eventType = SnapshotEventType(rawValue: jsonObject["type"].stringValue) {
-                var model: SnapshotEvent!
-                
-                switch eventType {
-                case .snapshotAcquiredEvent:
-                    model = SnapshotAcquiredEvent(fromJson: jsonObject)
-                case .snapshotApprovedEvent:
-                    model = SnapshotApprovedEvent(fromJson: jsonObject)
-                case .snapshotCameraRequestedEvent:
-                    model = SnapshotCameraRequestedEvent(fromJson: jsonObject)
-                case .snapshotCameraRequestProcessedEvent:
-                    model = SnapshotCameraRequestProcessedEvent(fromJson: jsonObject)
-                case .snapshotRequestedEvent:
-                    model = SnapshotRequestedEvent(fromJson: jsonObject)
-                }
-                
-                snapshotDelegate?.snapshotMessageReceived(model)
                 
             } else {
                 os_log("MQTT message with unknown type %@", log: Log.mqtt, type: .debug, jsonObject["type"].stringValue)
@@ -226,7 +195,7 @@ internal final class MQTTModule2: CocoaMQTTDelegate {
     }
     
     func mqttDidDisconnect(_ mqtt: CocoaMQTT, withError err: (any Error)?) {
-        print("MQTT2 mqttDidDisconnect (autoReconnect=\(mqtt.autoReconnect))")
+        print("MQTT2 mqttDidDisconnect (autoReconnect=\(mqtt.autoReconnect), error=\(err.map { String(describing: $0) } ?? "none"))")
         if mqtt.autoReconnect {
             self.reconnect()
         }

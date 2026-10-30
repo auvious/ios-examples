@@ -1,11 +1,8 @@
 ${PODS_ROOT}/Target Support Files/Pods-SimpleConference/Pods-SimpleConference-frameworks.sh
-${PODS_ROOT}/AuviousGoogleWebRTC/frameworks/WebRTC.framework
 ${BUILT_PRODUCTS_DIR}/AuviousSDK/AuviousSDK.framework
 ${BUILT_PRODUCTS_DIR}/CocoaMQTTWebsocket_IOS13/CocoaMQTTWebsocket_IOS13.framework
 ${BUILT_PRODUCTS_DIR}/MqttCocoaAsyncSocket_IOS13/MqttCocoaAsyncSocket_IOS13.framework
-${BUILT_PRODUCTS_DIR}/RxCocoa/RxCocoa.framework
-${BUILT_PRODUCTS_DIR}/RxRelay/RxRelay.framework
-${BUILT_PRODUCTS_DIR}/RxSwift/RxSwift.framework
 ${BUILT_PRODUCTS_DIR}/Sentry/Sentry.framework
 ${BUILT_PRODUCTS_DIR}/Starscream_IOS13/Starscream_IOS13.framework
 ${BUILT_PRODUCTS_DIR}/SwiftyJSON/SwiftyJSON.framework
+${PODS_XCFRAMEWORKS_BUILD_DIR}/AuviousGoogleWebRTC/WebRTC.framework/WebRTC
