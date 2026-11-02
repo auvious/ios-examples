@@ -9,7 +9,7 @@ target 'SimpleConference' do
   use_frameworks!
 
   # Pods for SimpleConference
-  pod 'AuviousSDK', '1.5.0-beta.1'
+  pod 'AuviousSDK', '1.5.0-beta.2'
   pod 'Sentry', '~> 8.0'
 
 end
