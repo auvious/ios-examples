@@ -249,6 +249,102 @@ class ConferenceManager: AuviousSDKConferenceDelegate {
 
 ---
 
+## Mobile Co-browse
+
+Co-browse lets the customer share this app's screen with an agent, without a video call. Both sides can draw on the shared
+screen, and sensitive views are sent as black boxes. The session UI lives in its own window above the app, so the customer
+can keep navigating while sharing.
+
+### Start a session
+
+The agent creates a co-browse ticket (PIN) and gives it to the customer. Start the session with that ticket, from the main thread:
+
+```swift
+import AuviousSDK
+
+var config = AuviousCobrowseConfiguration(ticket: pin,                       // the PIN created by the agent
+                                          baseEndpoint: "https://auvious.video/",
+                                          mqttEndpoint: "auvious.video")
+config.participantName = "Jane"                                             // optional
+config.masking.accessibilityIdentifiers = ["payment.iban", "card.*"]        // exact ids, or prefixes ending with *
+
+AuviousCobrowse.shared.start(configuration: config, delegate: self)
+```
+
+The SDK redeems the ticket, joins the agent's room and asks the customer to share the screen: a short explanation sheet,
+then the iOS screen recording prompt. The customer ends the session with the End button; the app can end it with
+`AuviousCobrowse.shared.stop()`.
+
+Session updates arrive on the main thread; all methods are optional:
+
+```swift
+extension MyViewController: AuviousCobrowseDelegate {
+    func cobrowse(didChangeState state: AuviousCobrowseState) { }   // connecting, awaitingConsent, sharing, notSharing, ...
+    func cobrowseDidEnd(reason: AuviousCobrowseEndReason) { }       // customerEnded, agentEnded, failed
+    func cobrowse(didFailWith error: AuviousSDKGenericError) { }
+}
+```
+
+### Portrait while sharing
+
+Co-browse is portrait only: rotating while the screen is shared stalls it on the agent's side. Return the SDK's orientations
+from your app delegate, so the app rotates to portrait when a session starts and back when it ends:
+
+```swift
+func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+    return AuviousCobrowse.shared.supportedInterfaceOrientations(otherwise: .allButUpsideDown)
+}
+```
+
+### Masking
+
+`AuviousMaskingRules` decides which views are blacked out. The whole frame of a masked view is covered, so mask the field,
+not the form.
+
+| Property                   | Type             | Default | Description                                                                        |
+| -------------------------- | ---------------- | ------- | ---------------------------------------------------------------------------------- |
+| `accessibilityIdentifiers` | `Set<String>`    | `[]`    | Exact identifiers, or prefixes ending with `*` (e.g. `"card.*"`).                  |
+| `viewClasses`              | `[UIView.Type]`  | `[]`    | View classes to mask, subclasses included.                                         |
+| `maskSecureTextFields`     | `Bool`           | `true`  | Mask password fields, and the keyboard while one is being edited.                  |
+| `maskAllTextInputs`        | `Bool`           | `false` | Mask every `UITextField` and `UITextView` unless marked `auviousMasked = false`.   |
+
+Views can also be marked directly:
+
+```swift
+cardNumberField.auviousMasked = true                 // always masked; false never masks it
+Text(iban).auviousMasked()                           // SwiftUI
+
+AuviousCobrowse.shared.maskingRules = rules          // change the rules at any time, also while sharing
+AuviousCobrowse.shared.debugHighlightMasks = true    // outline masked regions on the device to check your rules
+```
+
+### AuviousCobrowseConfiguration
+
+| Property              | Type                  | Default      | Description                                                                |
+| --------------------- | --------------------- | ------------ | -------------------------------------------------------------------------- |
+| `ticket`              | `String`              | —            | The co-browse ticket (PIN) created by the agent.                           |
+| `baseEndpoint`        | `String`              | —            | Base URL of the Auvious API (e.g. `"https://auvious.video/"`).             |
+| `mqttEndpoint`        | `String`              | —            | Hostname of the MQTT broker (e.g. `"auvious.video"`).                      |
+| `clientId`            | `String`              | `"customer"` | OAuth client id.                                                           |
+| `participantName`     | `String?`             | `nil`        | Name shown to the agent.                                                   |
+| `customerMetadata`    | `[String: Any]?`      | `nil`        | Metadata sent to the agent with the join request.                          |
+| `showsShareExplainer` | `Bool`                | `true`       | Show a short explanation before the iOS screen recording prompt.           |
+| `annotationsEnabled`  | `Bool`                | `true`       | Let the customer draw, and show the agent's drawings.                      |
+| `masking`             | `AuviousMaskingRules` | empty rules  | Which views are blacked out.                                               |
+| `showsMaskHints`      | `Bool`                | `true`       | Outline masked views on the customer's screen.                             |
+| `accentColor`         | `UIColor`             | Auvious red  | Color of the sharing border, status pill and End button.                   |
+
+### Co-browse during a video call
+
+Only one co-browse session runs at a time, and not alongside `AuviousConferenceVCNew`. To let the agent ask to co-browse
+during a call, set `cobrowseAvailable` on `AuviousConferenceConfiguration` (see [Co-browse & AR Pointer](#co-browse--ar-pointer)).
+While sharing, the call shrinks to picture-in-picture and the agent doesn't see it.
+
+See [`CobrowseDemoViewController`](SimpleConference/SimpleConference/CobrowseDemoViewController.swift) in the example app for a
+sample screen that starts a session and uses masking.
+
+---
+
 ## Configuration Options Reference
 
 ### AuviousConferenceConfiguration
@@ -286,6 +382,17 @@ Used when presenting `AuviousConferenceVCNew` for the built-in conference UI.
 | `speakerAvailable`          | `Bool`    | `true`      | Show the speaker toggle button.           |
 | `pipAvailable`              | `Bool`    | `true`      | Show the Picture-in-Picture button.       |
 | `screenSharingAvailable`    | `Bool`    | `true`      | Show the screen-sharing button.           |
+
+#### Co-browse & AR Pointer
+
+| Property                      | Type                  | Default     | Description                                                                                                            |
+| ----------------------------- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `cobrowseAvailable`           | `Bool`                | `false`     | Let the agent ask to co-browse the app during the call. The call shrinks to picture-in-picture while sharing.          |
+| `cobrowseMasking`             | `AuviousMaskingRules` | empty rules | Which views are blacked out in the co-browse screen share.                                                             |
+| `cobrowseAnnotationsEnabled`  | `Bool`                | `true`      | Let the customer draw on the shared screen, and show the agent's drawings.                                             |
+| `cobrowseShowsMaskHints`      | `Bool`                | `true`      | Outline masked views on the customer's screen.                                                                         |
+| `cobrowseShowsShareExplainer` | `Bool`                | `true`      | Show a short explanation before the iOS screen recording prompt.                                                       |
+| `arPointerAvailable`          | `Bool`                | `true`      | Let the agent point and draw on the customer's camera and screen share; the customer can draw back.                    |
 
 ---
 
