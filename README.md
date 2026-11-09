@@ -1,6 +1,6 @@
 # Auvious iOS SDK Examples
 
-This repository contains an example of how to use the Auvious Android SDK in an iOS project.
+This repository contains an example of how to use the Auvious iOS SDK in an iOS project.
 
 ## Example projects
 - [SimpleConference](SimpleConference) is a quick example of how to join a video call given a ticket, with SwiftUI
@@ -26,11 +26,11 @@ AuviousSDK is available through as a [CocoaPod](https://cocoapods.org). You can 
   ```
   Last but not least, you need to add the AuviousSDK pod on all targets that will need it
   ```ruby
-  pod 'AuviousSDK', '1.4.0'
+  pod 'AuviousSDK', '1.5.0'
   ```
 - Auvious SDK github repo. This method only requires the following line on the target dependencies:
   ```ruby
-  pod 'AuviousSDK', :git => 'https://github.com/auvious/auvious-sdk-ios.git', :tag => '1.4.0'
+  pod 'AuviousSDK', :git => 'https://github.com/auvious/auvious-sdk-ios.git', :tag => '1.5.0'
   ```
 
 Next you need to run `pod install` in order for AuviousSDK and it's dependencies to be installed in the project workspace.
@@ -101,7 +101,7 @@ class ViewController: UIViewController {
     func joinConference() {
         // 1. Build the configuration
         let config = AuviousConferenceConfiguration()
-        config.username = "<ticket>" // set the auvious ticket 
+        config.username = "<ticket>" // set the auvious ticket
         config.baseEndpoint = "https://auvious.video/"
         config.mqttEndpoint = "auvious.video"
 
@@ -257,83 +257,122 @@ Used when presenting `AuviousConferenceVCNew` for the built-in conference UI.
 
 #### Authentication & Connection
 
-| Property | Type | Description |
-|---|---|---|
-| `username` | `String` | Username (or ticket) used to authenticate with the Auvious platform. |
-| `password` | `String` | Password used to authenticate. |
-| `grantType` | `String` | OAuth grant type. Default: `"password"`. |
-| `clientId` | `String` | Client identifier registered on the Auvious platform. Default: `"customer"`  |
-| `conference` | `String` | Name of the conference room to join or create. |
-| `baseEndpoint` | `String` | Base URL of the Auvious API (e.g. `"https://auvious.video/"`). |
-| `mqttEndpoint` | `String` | Hostname of the MQTT WebSocket broker (e.g. `"auvious.video"`). |
+| Property       | Type     | Description                                                          |
+| -------------- | -------- | -------------------------------------------------------------------- |
+| `username`     | `String` | Username (or ticket) used to authenticate with the Auvious platform. |
+| `password`     | `String` | Password used to authenticate.                                       |
+| `grantType`    | `String` | OAuth grant type. Default: `"password"`.                             |
+| `clientId`     | `String` | Client identifier registered on the Auvious platform. Default: `"customer"`               |
+| `conference`   | `String` | Name of the conference room to join or create.                       |
+| `baseEndpoint` | `String` | Base URL of the Auvious API (e.g. `"https://auvious.video/"`).       |
+| `mqttEndpoint` | `String` | Hostname of the MQTT WebSocket broker (e.g. `"auvious.video"`).      |
 
 #### Call Behaviour
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `callMode` | `AuviousCallMode` | `.audioVideo` | Stream mode for the call. Use `.audio` for audio-only, `.video` for video-only, or `.audioVideo` for both. |
-| `enableSpeaker` | `Bool` | `true` | Route audio to the loudspeaker on join. |
-| `backgroundAudioEnabled` | `Bool` | `false` | Keep audio running when the app moves to the background. Requires the `audio` UIBackgroundMode in `Info.plist`. |
-| `participantName` | `String?` | `nil` | Optional display name shown to other participants. |
+| Property                 | Type              | Default       | Description                                                                                                     |
+| ------------------------ | ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `callMode`               | `AuviousCallMode` | `.audioVideo` | Stream mode for the call. Use `.audio` for audio-only, `.video` for video-only, or `.audioVideo` for both.      |
+| `enableSpeaker`          | `Bool`            | `true`        | Route audio to the loudspeaker on join.                                                                         |
+| `backgroundAudioEnabled` | `Bool`            | `false`       | Keep audio running when the app moves to the background. Requires the `audio` UIBackgroundMode in `Info.plist`. |
+| `participantName`        | `String?`         | `nil`         | Optional display name shown to other participants.                                                              |
 
 #### UI Controls
 
-| Property | Type | Default | Description |
-|---|---|---|---|
+| Property                    | Type      | Default     | Description                               |
+| --------------------------- | --------- | ----------- | ----------------------------------------- |
 | `conferenceBackgroundColor` | `UIColor` | `.darkGray` | Background colour of the conference view. |
-| `cameraAvailable` | `Bool` | `true` | Show the camera toggle button. |
-| `microphoneAvailable` | `Bool` | `true` | Show the microphone mute/unmute button. |
-| `speakerAvailable` | `Bool` | `true` | Show the speaker toggle button. |
-| `pipAvailable` | `Bool` | `true` | Show the Picture-in-Picture button. |
-| `screenSharingAvailable` | `Bool` | `true` | Show the screen-sharing button. |
+| `cameraAvailable`           | `Bool`    | `true`      | Show the camera toggle button.            |
+| `microphoneAvailable`       | `Bool`    | `true`      | Show the microphone mute/unmute button.   |
+| `speakerAvailable`          | `Bool`    | `true`      | Show the speaker toggle button.           |
+| `pipAvailable`              | `Bool`    | `true`      | Show the Picture-in-Picture button.       |
+| `screenSharingAvailable`    | `Bool`    | `true`      | Show the screen-sharing button.           |
 
 ---
 
 ### AuviousConferenceSDK — Key Properties
 
-| Property | Type | Description |
-|---|---|---|
-| `delegate` | `AuviousSDKConferenceDelegate?` | Receives stream, state, and error events. |
-| `publishVideoResolution` | `PublishVideoResolution` | Video quality for the outgoing stream. `.min` (640×480), `.mid` (960×720), `.max` (1920×1080). |
-| `isLoggedIn` | `Bool` | Whether the SDK is currently authenticated. Read-only. |
-| `userEndpointId` | `String?` | The current user's endpoint identifier. Read-only. |
+| Property                 | Type                            | Description                                                                                    |
+| ------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `delegate`               | `AuviousSDKConferenceDelegate?` | Receives stream, state, and error events.                                                      |
+| `publishVideoResolution` | `PublishVideoResolution`        | Video quality for the outgoing stream. `.min` (640×480), `.mid` (960×720), `.max` (1920×1080). |
+| `isLoggedIn`             | `Bool`                          | Whether the SDK is currently authenticated. Read-only.                                         |
+| `userEndpointId`         | `String?`                       | The current user's endpoint identifier. Read-only.                                             |
+
+---
+
+### AuviousDiagnostics — Error Reporting & Logging
+
+Set these before using the SDK, e.g. in `application(_:didFinishLaunchingWithOptions:)`. Same settings as the Android SDK.
+
+```swift
+AuviousDiagnostics.errorReporting = .custom(dsn: "https://<key>@<your-sentry>/<project>") // .auvious (default), .disabled
+AuviousDiagnostics.logLevel = .minimal                                                  // .minimal (default), .full
+AuviousDiagnostics.consoleLogLevel = .error
+```
+
+| Property          | Type                     | Default    | Description                                                                                                                         |
+| ----------------- | ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `errorReporting`  | `AuviousErrorReporting`  | `.auvious` | Where Sentry reports go: `.auvious`, `.custom(dsn:)` (your own Sentry) or `.disabled`.                                               |
+| `logLevel`        | `AuviousLogLevel`        | `.minimal` | What goes to Sentry. `.minimal`: crashes in the SDK, with its error logs as breadcrumbs. `.full`: also the SDK's errors as events and all its logs as breadcrumbs. |
+| `consoleLogLevel` | `AuviousConsoleLogLevel` | `.warning` | SDK console logs at this level or above: `.none`, `.error`, `.warning`, `.info`, `.debug`.                                           |
+
+Only crashes with a frame in the SDK's code (AuviousSDK, WebRTC) are reported, not the rest of the app's crashes. Reporting
+starts when the SDK is first used; a crash is sent the next time the app uses the SDK.
+
+If your app uses Sentry, start it before using the SDK. The SDK then leaves your Sentry as it is, sends its reports through a
+client of its own and catches no crashes. Otherwise the SDK starts Sentry itself to catch crashes, with everything else of
+Sentry's (sessions, app hangs, network and UI tracking) off.
 
 ---
 
 ### Enumerations
 
 #### AuviousCallMode
-| Value | Description |
-|---|---|
-| `.audio` | Audio-only call. |
-| `.video` | Video-only call. |
+
+| Value         | Description           |
+| ------------- | --------------------- |
+| `.audio`      | Audio-only call.      |
+| `.video`      | Video-only call.      |
 | `.audioVideo` | Audio and video call. |
 
 #### StreamType
-| Value | Description |
-|---|---|
-| `.mic` | Audio stream only. |
-| `.cam` | Video stream only. |
+
+| Value        | Description             |
+| ------------ | ----------------------- |
+| `.mic`       | Audio stream only.      |
+| `.cam`       | Video stream only.      |
 | `.micAndCam` | Audio and video stream. |
-| `.screen` | Screen-sharing stream. |
+| `.screen`    | Screen-sharing stream.  |
 
 #### PublishVideoResolution
-| Value | Resolution |
-|---|---|
-| `.min` | 640 × 480 |
-| `.mid` | 960 × 720 |
+
+| Value  | Resolution  |
+| ------ | ----------- |
+| `.min` | 640 × 480   |
+| `.mid` | 960 × 720   |
 | `.max` | 1920 × 1080 |
 
 #### AuviousSDKGenericError
-| Value | Description |
-|---|---|
-| `.AUTHENTICATION_FAILURE` | Credentials were rejected by the platform. |
-| `.PERMISSION_REQUIRED` | Camera or microphone permission was denied by the user. |
-| `.NETWORK_ERROR` | A network-level failure occurred. |
-| `.CALL_REJECTED` | The call was rejected by the remote party. |
-| `.CONFERENCE_MISSING` | The specified conference room does not exist. |
-| `.INVALID_TICKET(ticketId)` | The provided ticket is invalid or expired. |
-| `.UNKNOWN_FAILURE` | An unexpected error occurred. |
+
+| Value                       | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `.AUTHENTICATION_FAILURE`   | Credentials were rejected by the platform.              |
+| `.PERMISSION_REQUIRED`      | Camera or microphone permission was denied by the user. |
+| `.NETWORK_ERROR`            | A network-level failure occurred.                       |
+| `.CALL_REJECTED`            | The call was rejected by the remote party.              |
+| `.CONFERENCE_MISSING`       | The specified conference room does not exist.           |
+| `.INVALID_TICKET(ticketId)` | The provided ticket is invalid or expired.              |
+| `.UNKNOWN_FAILURE`          | An unexpected error occurred.                           |
 
 ---
 
+---
+
+## What's new in 1.5.0
+
+- **Mobile co-browse** - `AuviousCobrowse` shares the app's screen with an agent, without a call or from within one. Sensitive views are masked, and both sides can draw on the shared screen
+- **AR pointer** - the agent can point and draw on the customer's camera and screen share
+- **Network recovery** - the call's streams and MQTT connection recover after a network drop, and missed conference events are caught up
+- **Conference UI** - placeholder tiles for participants without video, tap a remote video to switch between fit and fill, pinch to zoom a shared screen
+- **Error reporting** - `AuviousDiagnostics`: Sentry reports go to Auvious by default, to your own project with `.custom(dsn:)`, or nowhere with `.disabled`. Only crashes in the SDK's code are reported. `consoleLogLevel` sets the SDK's console logs (default `.warning`). The app no longer needs to start Sentry itself
+- **Requirements** - iOS 15, WebRTC M155 (Unified Plan), Metal video views

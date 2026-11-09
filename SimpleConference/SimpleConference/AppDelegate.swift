@@ -6,7 +6,6 @@
 //
 
 import UIKit
-import Sentry
 import AuviousSDK
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,15 +17,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         //Prevent device locking
         UIApplication.shared.isIdleTimerDisabled = true
 
-        SentrySDK.start { options in
-            options.dsn = "https://74765e10688d4f828efd5bc5320c607c@sentry.auvious.com/9"
-            options.debug = false
-            options.environment = "staging"
-            #if DEBUG
-            // Xcode re-runs kill the app without a version change, which Sentry reports as a watchdog termination
-            options.enableWatchdogTerminationTracking = false
-            #endif
-        }
+        //Sentry: crashes in the SDK go to Auvious by default. Your own project with .custom(dsn:), none with .disabled
+        AuviousDiagnostics.errorReporting = .auvious
+        //What is sent: .minimal (default) or .full
+        AuviousDiagnostics.logLevel = .minimal
+        //SDK console logs: .none, .error, .warning (default), .info or .debug
+        AuviousDiagnostics.consoleLogLevel = .warning
 
         return true
     }
